@@ -28,9 +28,11 @@ import {
   User,
   X,
   Check,
+  ArrowRight,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Navbar } from "@/components/Navbar";
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -65,8 +67,11 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Navigation */}
+      <Navbar />
+      
       {/* SECTION 1: HERO */}
-      <section className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-20">
+      <section className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-20 pt-32">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 animate-glow-pulse" />
         
         <div className="container max-w-7xl relative z-10">
@@ -116,18 +121,22 @@ const Landing = () => {
 
               {/* CTA */}
               <div className="space-y-3">
-                <Button
-                  onClick={handleLogin}
-                  size="lg"
-                  className="w-full sm:w-auto h-14 px-12 text-lg font-semibold bg-primary hover:bg-primary/90 glow-accent"
+                <Link 
+                  to="/dashboard"
+                  className="
+                    inline-flex items-center justify-center gap-3
+                    px-12 py-4 text-lg font-bold
+                    bg-gradient-to-r from-cyan-500 to-blue-500
+                    rounded-full
+                    hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/50
+                    transition-all duration-300
+                  "
                 >
-                  <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="currentColor">
-                    <circle cx="12" cy="12" r="10" />
-                  </svg>
-                  Login with Circle
-                </Button>
+                  Enter Arena
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
                 <p className="text-xs text-muted-foreground">
-                  Secure authentication via your Circle account
+                  Already a member? Click above to jump in!
                 </p>
               </div>
             </div>

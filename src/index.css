@@ -335,4 +335,50 @@ All colors MUST be HSL.
   .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
   .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
   .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+
+  /* Navigation styles */
+  .nav-link {
+    @apply font-medium text-white hover:text-cyan-400 
+           transition-colors relative;
+  }
+
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #0EA5E9;
+    transition: width 0.3s ease;
+  }
+
+  .nav-link:hover::after {
+    width: 100%;
+  }
+
+  .nav-dropdown-item {
+    @apply block px-4 py-3 text-white hover:bg-cyan-500/10 
+           hover:text-cyan-400 transition-colors;
+  }
+
+  .mobile-nav-item {
+    @apply block px-4 py-3 text-white hover:bg-cyan-500/10 
+           rounded-lg transition-colors;
+  }
+
+  @keyframes slide-down {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-down {
+    animation: slide-down 200ms ease-out;
+  }
 }

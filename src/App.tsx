@@ -12,6 +12,8 @@ import MyProgress from "./pages/MyProgress";
 import Giveaways from "./pages/Giveaways";
 import LEAP from "./pages/LEAP";
 import MyBadges from "./pages/MyBadges";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +35,8 @@ const App = () => (
           <Route path="/giveaways" element={<Layout><Giveaways /></Layout>} />
           <Route path="/leap" element={<Layout><LEAP /></Layout>} />
           <Route path="/badges" element={<Layout><MyBadges /></Layout>} />
+          <Route path="/profile" element={<Layout><Profile /></Layout>} />
+          <Route path="/settings" element={<Layout><Settings /></Layout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
