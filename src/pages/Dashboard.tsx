@@ -65,126 +65,210 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen p-8 space-y-8 animate-fade-in">
-      {/* Hero Section */}
-      <div className="glass-card p-8">
-        <div className="flex items-center justify-between gap-8">
-          <div className="flex items-center gap-8">
+    <div className="min-h-screen p-8 space-y-10 animate-fade-in">
+      {/* Hero Section - Redesigned with Glassmorphism */}
+      <div className="glass-card-hero p-10">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
+          {/* Left: Level Progress */}
+          <div className="flex flex-col items-center gap-6">
             <LevelProgress
               currentLevel={userData.level}
               currentXP={userData.currentXP}
               nextLevelXP={userData.nextLevelXP}
               size="lg"
             />
-            <div>
-              <h2 className="text-3xl font-bold mb-2">Level {userData.level}</h2>
-              <div className="flex items-center gap-4">
-                <div>
-                  <span className="font-mono text-2xl font-bold text-primary">
-                    {userData.currentXP.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-muted-foreground ml-2">XP</span>
-                </div>
-                <div className="h-8 w-px bg-border" />
-                <div className="text-sm text-muted-foreground">
-                  {(userData.nextLevelXP - userData.currentXP).toLocaleString()} XP to Level {userData.level + 1}
-                </div>
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                XP Trend (7 Days)
               </div>
-              <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
+              <div className="flex gap-1 items-end justify-center h-12">
+                {userData.monthlyXP.map((xp, i) => (
+                  <div
+                    key={i}
+                    className="w-4 bg-gradient-to-t from-primary to-cyan-400 rounded-t"
+                    style={{ height: `${(xp / 340) * 100}%` }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: XP Stats */}
+          <div className="flex-1 space-y-6">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                Current XP
+              </div>
+              <div className="font-mono text-7xl font-bold glow-text tracking-tight">
+                {userData.currentXP.toLocaleString()}
+              </div>
+              <div className="text-sm text-success glow-success mt-2 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                <span className="font-semibold">+340 this month</span>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                To Next Level
+              </div>
+              <div className="font-mono text-3xl font-bold text-primary">
+                {(userData.nextLevelXP - userData.currentXP).toLocaleString()} XP
+              </div>
+              <div className="mt-3 h-3 bg-black/50 rounded-full overflow-hidden border border-primary/20">
                 <div
-                  className="h-full bg-primary transition-all duration-500"
+                  className="h-full animated-gradient transition-all duration-500"
                   style={{ width: `${(userData.currentXP / userData.nextLevelXP) * 100}%` }}
                 />
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <div className="flex items-center gap-2 mb-1">
-                <Flame className="w-5 h-5 text-warning" />
-                <span className="font-mono text-xl font-bold">{userData.streak}</span>
+
+            <div className="glass-card p-4 inline-flex items-center gap-3 animate-pulse-glow">
+              <Flame className="w-6 h-6 text-warning" />
+              <div>
+                <div className="font-mono text-2xl font-bold">{userData.streak}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                  Day Streak
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground">Day Streak</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         {/* Active Contests */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold">Available Contests</h3>
-            <Button variant="ghost" size="sm">View All →</Button>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+              Available Contests
+            </h3>
+            <Button variant="ghost" size="sm" className="hover-lift">
+              View All →
+            </Button>
           </div>
           <div className="space-y-4">
-            {activeContests.map((contest) => (
-              <ContestCard key={contest.id} {...contest} />
-            ))}
-          </div>
-        </div>
-
-        {/* Activity Feed */}
-        <div className="space-y-4">
-          <h3 className="text-xl font-bold">Recent Activity</h3>
-          <div className="glass-card p-6 space-y-4">
-            {activityFeed.map((activity, idx) => (
-              <div key={idx} className="flex gap-3 pb-4 border-b border-border last:border-0 last:pb-0">
-                <div className="w-2 h-2 rounded-full bg-primary mt-2" />
-                <div className="flex-1">
-                  <p className="text-sm">{activity.text}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
-                </div>
+            {activeContests.map((contest, index) => (
+              <div
+                key={contest.id}
+                className="animate-slide-in-right"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <ContestCard {...contest} />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="space-y-4">
-          <h3 className="text-xl font-bold">Quick Stats</h3>
-          <div className="space-y-3">
-            {stats.map((stat, idx) => (
-              <div key={idx} className="glass-card p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">{stat.label}</span>
-                  {stat.trend && (
-                    <span className={`text-xs font-semibold ${stat.trend.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
-                      {stat.trend}
-                    </span>
-                  )}
-                </div>
-                <div className="font-mono text-2xl font-bold">{stat.value}</div>
-                {stat.progress !== undefined && (
-                  <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{ width: `${stat.progress}%` }}
-                    />
+        {/* Activity Feed - Timeline Design */}
+        <div className="space-y-6">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+            Recent Activity
+          </h3>
+          <div className="glass-card p-8 relative">
+            <div className="timeline-line" />
+            <div className="space-y-6 relative pl-8">
+              {activityFeed.map((activity, idx) => (
+                <div
+                  key={idx}
+                  className="group hover-lift rounded-lg p-3 -ml-3 hover:bg-white/5 cursor-pointer"
+                  style={{ animationDelay: `${idx * 100}ms` }}
+                >
+                  <div className="flex gap-4 items-start">
+                    <div className="timeline-dot absolute left-0 top-5" />
+                    <div className="icon-gradient flex-shrink-0">
+                      {activity.type === 'submit' && <Award className="w-4 h-4 text-white" />}
+                      {activity.type === 'badge' && <Award className="w-4 h-4 text-white" />}
+                      {activity.type === 'level' && <TrendingUp className="w-4 h-4 text-white" />}
+                      {activity.type === 'social' && <Award className="w-4 h-4 text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{activity.text}</p>
+                      <p className="text-xs text-muted-foreground mt-1 opacity-60">
+                        {activity.time}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Stats - Enhanced with Icons */}
+        <div className="space-y-6">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+            Quick Stats
+          </h3>
+          <div className="space-y-4">
+            {stats.map((stat, idx) => (
+              <div
+                key={idx}
+                className="glass-card-elevated p-6 hover-lift cursor-pointer"
+                style={{ animationDelay: `${idx * 100}ms` }}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="icon-gradient">
+                    {idx === 0 && <Award className="w-5 h-5 text-white" />}
+                    {idx === 1 && <TrendingUp className="w-5 h-5 text-white" />}
+                    {idx === 2 && <Award className="w-5 h-5 text-white" />}
+                    {idx === 3 && <Award className="w-5 h-5 text-white" />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs uppercase tracking-widest text-muted-foreground opacity-60">
+                        {stat.label}
+                      </span>
+                      {stat.trend && (
+                        <span
+                          className={`text-xs font-bold ${
+                            stat.trend.startsWith('+') ? 'text-success glow-success' : 'text-destructive'
+                          }`}
+                        >
+                          {stat.trend}
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono text-4xl font-bold tracking-tight glow-text">
+                      {stat.value}
+                    </div>
+                    {stat.progress !== undefined && (
+                      <div className="mt-3 h-2 bg-black/50 rounded-full overflow-hidden border border-primary/20">
+                        <div
+                          className="h-full animated-gradient transition-all duration-500"
+                          style={{ width: `${stat.progress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Motivation Box */}
-          <div className="glass-card p-6 bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
-            <div className="flex items-center gap-2 mb-3">
-              <Award className="w-5 h-5 text-primary" />
-              <h4 className="font-bold">This Week's Top Performer</h4>
+          {/* Motivation Box - Enhanced */}
+          <div className="glass-card-elevated p-8 gradient-border hover-lift">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="icon-gradient">
+                <Award className="w-5 h-5 text-white" />
+              </div>
+              <h4 className="font-bold text-lg">Top Performer</h4>
             </div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent" />
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-cyan-400 animate-pulse-glow" />
               <div>
-                <p className="font-semibold">Sarah Kumar</p>
-                <p className="text-xs text-muted-foreground">Level 8 • 4,892 XP</p>
+                <p className="font-bold text-lg">Sarah Kumar</p>
+                <p className="text-sm text-muted-foreground">Level 8 • 4,892 XP</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-3">Won 3 contests this week</p>
-            <div className="pt-3 border-t border-border text-xs">
-              <TrendingUp className="w-4 h-4 inline mr-1 text-primary" />
-              You're in top <span className="font-semibold text-primary">15%</span> of Level 6 members
+            <p className="text-sm text-muted-foreground mb-4">
+              Won 3 contests this week
+            </p>
+            <div className="pt-4 border-t border-primary/20 text-sm">
+              <TrendingUp className="w-4 h-4 inline mr-2 text-primary" />
+              You're in top{' '}
+              <span className="font-bold text-primary glow-text">15%</span> of Level 6 members
             </div>
           </div>
         </div>
