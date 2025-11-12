@@ -58,7 +58,7 @@ const Auth = () => {
           <div className="flex justify-center">
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center animate-pulse-glow">
               <img 
-                src="/favicon.png" 
+                src="/logo.png" 
                 alt="1to10x Contest Arena" 
                 className="w-full h-full object-contain"
               />
