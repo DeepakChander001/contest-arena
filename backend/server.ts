@@ -81,8 +81,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Google OAuth routes
-app.get('/api/auth/google/url', getGoogleAuthUrl);
+// Google OAuth routes - MUST be registered before static file serving
+app.get('/api/auth/google/url', (req, res) => {
+  console.log('✅ API route /api/auth/google/url matched - calling handler');
+  return getGoogleAuthUrl(req, res);
+});
 app.get('/api/auth/google/callback', handleGoogleCallback);
 app.get('/api/auth/user', getCurrentUser);
 app.post('/api/auth/logout', logout);
