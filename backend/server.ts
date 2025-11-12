@@ -458,42 +458,37 @@ app.get('/api/member-spaces', (req, res) => {
   getMemberSpacesHandler(req, res);
 });
 
-// CRITICAL: Add explicit middleware to ensure API routes are never intercepted
-// This must be BEFORE static file serving
-app.use('/api', (req, res, next) => {
-  // This middleware ensures /api routes are never caught by static file serving
-  // It just passes through to the API route handlers
-  next();
-});
-
+// ============================================================================
+// STATIC FILE SERVING - MUST BE AFTER ALL API ROUTES
+// ============================================================================
 // Serve frontend static files in production (if frontend is built and in dist folder)
 // This allows the backend to serve the React app for SPA routing
-// IMPORTANT: This must be AFTER all API routes but BEFORE starting the server
-(async () => {
-  if (process.env.NODE_ENV === 'production') {
-    const frontendDistPath = path.resolve(__dirname, '../dist');
-    const fs = await import('fs');
-    
-    // Check if dist folder exists
+// CRITICAL: This is registered AFTER all API routes to ensure API routes are matched first
+
+if (process.env.NODE_ENV === 'production') {
+  const frontendDistPath = path.resolve(__dirname, '../dist');
+  
+  // Use dynamic import for fs to check if dist exists
+  import('fs').then((fs) => {
     if (fs.existsSync(frontendDistPath)) {
       console.log('📦 Serving frontend static files from:', frontendDistPath);
       
-      // CRITICAL: Wrap express.static() in middleware that checks path FIRST
-      // This ensures API routes are NEVER served static files
-      const staticFileHandler = express.static(frontendDistPath, {
-        index: false, // Don't auto-serve index.html
-      });
-      
-      // Middleware that wraps static file serving - checks path BEFORE serving
+      // CRITICAL: Create a middleware that ONLY serves static files for NON-API routes
+      // We explicitly check the path BEFORE calling express.static()
       app.use((req, res, next) => {
-        // CRITICAL: Skip static file serving for ALL API routes
+        // CRITICAL: NEVER serve static files for API routes
         if (req.path.startsWith('/api/')) {
-          console.log('🚫 Skipping static file serving for API route:', req.path);
-          return next(); // Pass to API route handlers - don't serve static files
+          // This is an API route - skip static file serving completely
+          return next(); // Pass to API route handlers
         }
-        // For non-API routes, try to serve static files
-        // If file not found, staticFileHandler will call next() automatically
-        staticFileHandler(req, res, (err) => {
+        
+        // This is NOT an API route - try to serve static file
+        // Use express.static() but only for non-API routes
+        const staticHandler = express.static(frontendDistPath, {
+          index: false, // Don't auto-serve index.html
+        });
+        
+        staticHandler(req, res, (err) => {
           // If static file not found (404), pass to next middleware (SPA routing)
           if (err && err.status === 404) {
             return next();
@@ -507,26 +502,36 @@ app.use('/api', (req, res, next) => {
       
       // SPA routing: serve index.html for all non-API routes that don't match static files
       // This must be the LAST route handler
-      app.get('*', (req, res, next) => {
+      app.get('*', (req, res) => {
         // CRITICAL: Never serve index.html for API routes
         if (req.path.startsWith('/api/')) {
-          console.error('❌ API route caught by catch-all:', req.path);
-          return res.status(404).json({ error: 'API endpoint not found', path: req.path });
+          console.error('❌ ERROR: API route caught by catch-all route:', req.path);
+          console.error('❌ This should never happen - API routes should be handled above');
+          return res.status(404).json({ 
+            error: 'API endpoint not found', 
+            path: req.path,
+            message: 'This API route was caught by the catch-all handler. Check route registration order.'
+          });
         }
-        // Serve index.html for SPA routing
+        // Serve index.html for SPA routing (non-API routes only)
         res.sendFile(path.join(frontendDistPath, 'index.html'));
       });
     } else {
       console.log('⚠️ Frontend dist folder not found. Assuming frontend is served separately.');
     }
-  }
-  
-  // Start server
-  app.listen(PORT, () => {
-    console.log(`🚀 API server running on port ${PORT}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✓ Configured' : '✗ Missing'}`);
-    console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com'}`);
-    console.log(`🍪 Session Secret: ${process.env.SESSION_SECRET ? '✓ Set' : '✗ Using default'}`);
+  }).catch((err) => {
+    console.log('⚠️ Could not check for frontend dist folder:', err.message);
   });
-})();
+}
+
+// ============================================================================
+// START SERVER
+// ============================================================================
+app.listen(PORT, () => {
+  console.log(`🚀 API server running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✓ Configured' : '✗ Missing'}`);
+  console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com'}`);
+  console.log(`🍪 Session Secret: ${process.env.SESSION_SECRET ? '✓ Set' : '✗ Using default'}`);
+  console.log(`📡 Server ready to accept requests`);
+});
