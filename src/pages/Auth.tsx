@@ -21,62 +21,132 @@ const Auth = () => {
   
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // Fetch Circle member data (optional, non-blocking)
-  const fetchCircleMemberData = async (email: string) => {
+  // Fallback: Fetch Circle data from your backend (to avoid CORS)
+  const fetchCircleFromBackend = async (email: string) => {
     try {
-      const CIRCLE_API_KEY = import.meta.env.VITE_CIRCLE_API_KEY;
-      const CIRCLE_COMMUNITY_ID = import.meta.env.VITE_CIRCLE_COMMUNITY_ID;
+      const API_URL = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
       
-      if (!CIRCLE_API_KEY || !CIRCLE_COMMUNITY_ID) {
-        console.log('ℹ️ Circle.so not configured, skipping member fetch');
-        return;
-      }
-
-      console.log('🔄 Fetching Circle member data...');
+      console.log('🔄 Fetching Circle data from backend...');
       
-      // Use the correct Circle API endpoint
-      const response = await fetch(`https://app.circle.so/api/v1/community_members?community_id=${CIRCLE_COMMUNITY_ID}&email=${encodeURIComponent(email)}`, {
+      const response = await fetch(`${API_URL}/api/member?email=${encodeURIComponent(email)}`, {
         method: 'GET',
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${CIRCLE_API_KEY}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         }
       });
 
-      // Check response
-      if (!response.ok) {
-        console.warn(`⚠️ Circle API returned status ${response.status}`);
-        
-        // Check if it's a CORS or network error
-        if (response.status === 0) {
-          console.log('ℹ️ Circle API blocked by CORS - this is expected for client-side calls');
-          // You might need to make this call from your backend instead
-          return;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.id) {
+            console.log('✅ Circle member fetched via backend');
+            localStorage.setItem('circle_member', JSON.stringify(data));
+          }
         }
-        
+      }
+    } catch (error) {
+      console.log('ℹ️ Backend Circle fetch failed (non-blocking)');
+    }
+  };
+
+  // Sync with Circle using Headless API (optional, non-blocking)
+  const syncWithCircle = async (email: string) => {
+    try {
+      const CIRCLE_API_KEY = import.meta.env.VITE_CIRCLE_HEADLESS_API_KEY;
+      
+      if (!CIRCLE_API_KEY) {
+        console.log('ℹ️ Circle Headless API not configured, trying backend...');
+        await fetchCircleFromBackend(email);
         return;
       }
 
-      // Check content type
+      console.log('🔄 Syncing with Circle Headless API...');
+      
+      // For headless API, use Bearer token and no community_id needed
+      const response = await fetch(`https://app.circle.so/api/v1/members?email=${encodeURIComponent(email)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${CIRCLE_API_KEY}`, // Headless API uses Bearer token
+          'Accept': 'application/json',
+        }
+      });
+
+      // Check if response is JSON
       const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        console.warn('⚠️ Circle API returned non-JSON response');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.log('⚠️ Circle API returned non-JSON response, trying backend...');
+        await fetchCircleFromBackend(email);
+        return;
+      }
+
+      if (!response.ok) {
+        console.log(`⚠️ Circle API returned status ${response.status}, trying backend...`);
+        await fetchCircleFromBackend(email);
         return;
       }
 
       const data = await response.json();
       
-      if (data && data.length > 0) {
-        console.log('✅ Circle member found');
-        localStorage.setItem('circle_member', JSON.stringify(data[0]));
+      if (data && (data.member || data.data || (Array.isArray(data) && data.length > 0))) {
+        const member = data.member || data.data || (Array.isArray(data) ? data[0] : null);
+        if (member) {
+          console.log('✅ Circle member found');
+          localStorage.setItem('circle_member', JSON.stringify(member));
+        }
       } else {
         console.log('ℹ️ User not found in Circle community');
       }
       
     } catch (error) {
-      // Don't block sign-in for Circle errors
-      console.log('ℹ️ Circle member fetch failed (non-blocking):', error);
+      console.log('ℹ️ Circle sync failed (non-blocking), trying backend...', error);
+      // Try backend fallback
+      await fetchCircleFromBackend(email);
+    }
+  };
+
+  // Sync with your backend (optional)
+  const syncWithBackend = async (userInfo: any, credential: string) => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
+      
+      console.log('🔄 Syncing with backend...');
+      
+      const response = await fetch(`${API_URL}/api/auth/google`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${credential}`
+        },
+        body: JSON.stringify({
+          email: userInfo.email,
+          name: userInfo.name,
+          credential: credential
+        })
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Backend sync successful');
+          
+          // Store any additional data from backend
+          if (data.user) {
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            localStorage.setItem('user', JSON.stringify({
+              ...currentUser,
+              ...data.user
+            }));
+          }
+        }
+      } else {
+        console.log('⚠️ Backend returned non-JSON response');
+      }
+    } catch (error) {
+      console.log('ℹ️ Backend sync failed (non-blocking):', error);
     }
   };
 
@@ -84,7 +154,7 @@ const Auth = () => {
   const handleGoogleCallback = useCallback(async (response: any) => {
     console.log('🎯 Google callback triggered!');
     
-    // Handle FedCM abort gracefully
+    // Handle user cancellation
     if (response.error === 'user_cancel' || response.error === 'popup_closed') {
       console.log('User cancelled sign-in');
       return;
@@ -92,7 +162,10 @@ const Auth = () => {
 
     if (response.error) {
       console.error('❌ Google Sign-In error:', response.error);
-      setMessage({ type: 'error', text: `Sign-in failed: ${response.error}` });
+      // Don't show error for FedCM issues
+      if (!response.error.includes('FedCM')) {
+        setMessage({ type: 'error', text: `Sign-in failed: ${response.error}` });
+      }
       setLoading(false);
       return;
     }
@@ -134,8 +207,11 @@ const Auth = () => {
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('google_credential', credential);
 
-      // Try to fetch Circle member data (optional, non-blocking)
-      await fetchCircleMemberData(userInfo.email);
+      // Sync with Circle (headless API, optional, non-blocking)
+      await syncWithCircle(userInfo.email);
+
+      // Optional: Sync with your backend
+      await syncWithBackend(userInfo, credential);
 
       // Map to format expected by AuthContext
       const googleUserData = {
@@ -309,14 +385,20 @@ const Auth = () => {
       }, 500);
     };
 
+    let attempts = 0;
+
     const initializeGoogleSignIn = () => {
-      if (!window.google?.accounts?.id || !googleButtonRef.current || !isMounted) {
-        // Retry if Google object not ready yet
-        setTimeout(() => {
-          if (isMounted) initializeGoogleSignIn();
-        }, 500);
+      if (!window.google?.accounts?.id) {
+        attempts++;
+        if (attempts < 10 && isMounted) {
+          setTimeout(initializeGoogleSignIn, 500);
+        } else if (isMounted) {
+          setMessage({ type: 'error', text: 'Google Sign-In failed to load. Please refresh the page.' });
+        }
         return;
       }
+
+      if (!googleButtonRef.current || !isMounted) return;
 
       try {
         console.log('🔧 Initializing Google Sign-In...');
@@ -324,7 +406,7 @@ const Auth = () => {
         // Clear container
         googleButtonRef.current.innerHTML = '';
 
-        // Initialize Google Sign-In with global callback and FedCM support
+        // Initialize Google Sign-In with global callback (FedCM DISABLED)
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: window.handleGoogleCallback, // Use global callback
@@ -333,7 +415,7 @@ const Auth = () => {
           context: 'signin',
           ux_mode: 'popup',
           itp_support: true,
-          use_fedcm_for_prompt: true // Enable FedCM (Federated Credential Management)
+          use_fedcm_for_prompt: false // CRITICAL: Disable FedCM to avoid callback issues
         });
 
         console.log('🎨 Rendering button...');
@@ -354,14 +436,15 @@ const Auth = () => {
         );
 
         setButtonReady(true);
-        console.log('✅ Google Sign-In button ready!');
+        console.log('✅ Google Sign-In ready (FedCM disabled)');
 
-        // Optional: Try One Tap (with FedCM)
+        // Optional: Enable One Tap
         window.google.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
-            // One Tap not shown or skipped
-            const reason = notification.getNotDisplayedReason?.() || notification.getSkippedReason?.();
-            console.log('One Tap not shown:', reason);
+          if (notification.isNotDisplayed?.()) {
+            const reason = notification.getNotDisplayedReason?.();
+            if (reason !== 'suppressed_by_user') {
+              console.log('One Tap not displayed:', reason);
+            }
           } else {
             console.log('📱 One Tap status:', notification?.getMomentType?.() || notification);
           }
