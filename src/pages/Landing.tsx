@@ -38,7 +38,7 @@ import initScrollReveal from "@/utils/scrollReveal";
 
 const Landing = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, loginWithGoogle } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [counts, setCounts] = useState({ members: 0, contests: 0, qualified: 0, prizes: 0 });
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const heroRef = useRef<HTMLDivElement>(null);
@@ -189,7 +189,7 @@ const Landing = () => {
                 ) : (
                   <>
                     <button
-                      onClick={loginWithGoogle}
+                      onClick={() => navigate('/auth')}
                       className="btn-premium inline-flex items-center justify-center gap-3 px-8 py-4 text-lg font-bold rounded-full hover-glow animate-cta-magnetic"
                     >
                       <Rocket className="w-5 h-5" />

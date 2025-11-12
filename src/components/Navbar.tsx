@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -8,7 +8,8 @@ export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
-  const { user, logout, isAuthenticated, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout, isAuthenticated } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -127,7 +128,7 @@ export const Navbar = () => {
                 <>
                   {/* Login Button */}
                   <button
-                    onClick={loginWithGoogle}
+                    onClick={() => navigate('/auth')}
                     className="
                       px-4 py-2
                       bg-gradient-to-r from-cyan-500 to-blue-500
