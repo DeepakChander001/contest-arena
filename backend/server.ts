@@ -78,13 +78,29 @@ app.use(passport.session());
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  console.log('✅ Health check endpoint called');
+  res.setHeader('Content-Type', 'application/json');
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Google OAuth routes - MUST be registered before static file serving
-app.get('/api/auth/google/url', (req, res) => {
+// CRITICAL: These routes must return JSON, not HTML
+app.get('/api/auth/google/url', (req, res, next) => {
   console.log('✅ API route /api/auth/google/url matched - calling handler');
-  return getGoogleAuthUrl(req, res);
+  console.log('✅ Request method:', req.method);
+  console.log('✅ Request path:', req.path);
+  console.log('✅ Request URL:', req.url);
+  console.log('✅ Request originalUrl:', req.originalUrl);
+  
+  // CRITICAL: Set JSON content type BEFORE calling handler
+  res.setHeader('Content-Type', 'application/json');
+  
+  try {
+    getGoogleAuthUrl(req, res);
+  } catch (error) {
+    console.error('❌ Error in OAuth URL handler:', error);
+    next(error);
+  }
 });
 app.get('/api/auth/google/callback', handleGoogleCallback);
 app.get('/api/auth/user', getCurrentUser);
