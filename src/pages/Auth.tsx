@@ -1,40 +1,78 @@
-import { useGoogleLogin } from "@react-oauth/google";
 import { AlertCircle, CheckCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-interface GoogleUserInfo {
-  email: string;
-  name: string;
-  picture: string;
-  sub: string;
+declare global {
+  interface Window {
+    google: any;
+    handleCredentialResponse: (response: any) => void;
+  }
 }
 
 const Auth = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [clientIdReady, setClientIdReady] = useState(false);
+  const [googleLoaded, setGoogleLoaded] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   
   const { isAuthenticated, user, handleGoogleLogin: handleAuthLogin } = useAuth();
   const navigate = useNavigate();
+  
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // Check if Google Client ID is configured
-  useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (clientId) {
-      console.log('✅ Google Client ID found');
-      setClientIdReady(true);
-    } else {
-      console.error('❌ Google Client ID is missing!');
-      setMessage({ 
-        type: 'error', 
-        text: 'Google Sign-In is not configured. Please contact support or check environment variables.' 
-      });
+  // Handle Google credential response
+  const handleCredentialResponse = async (response: any) => {
+    console.log("✅ Credential received:", response);
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const credential = response.credential;
+      
+      if (!credential) {
+        throw new Error('No credential received');
+      }
+
+      // Decode JWT token to get user info
+      const base64Url = credential.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64).split('').map((c) => {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join('')
+      );
+      
+      const userInfo = JSON.parse(jsonPayload);
+      console.log("✅ User info decoded:", userInfo);
+
+      // Map to format expected by AuthContext
+      const googleUserData = {
+        email: userInfo.email,
+        name: userInfo.name,
+        picture: userInfo.picture,
+        sub: userInfo.sub,
+      };
+
+      // Call AuthContext handler to process the login (fetches Circle data)
+      await handleAuthLogin(googleUserData);
+      
+      // Redirect to dashboard (AuthContext will handle this, but ensure it happens)
+      navigate('/dashboard', { replace: true });
+      
+    } catch (err: any) {
+      console.error('❌ Error processing credential:', err);
+      setMessage({ type: 'error', text: err.message || 'Failed to sign in. Please try again.' });
+      setLoading(false);
     }
-  }, []);
+  };
 
-  // If user is already authenticated, redirect to dashboard
+  // Make function available globally
+  useEffect(() => {
+    window.handleCredentialResponse = handleCredentialResponse;
+  }, [handleCredentialResponse]);
+
+  // Check if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
       console.log('✅ User already authenticated, redirecting to dashboard');
@@ -42,120 +80,140 @@ const Auth = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
-  // Use useGoogleLogin hook instead of GoogleLogin component to avoid width issues
-  const login = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setMessage(null);
-      
-      console.log('✅ Google OAuth Success');
-      console.log('📝 Token Response:', tokenResponse);
-      
-      try {
-        // Fetch user info from Google
-        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: {
-            Authorization: `Bearer ${tokenResponse.access_token}`,
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch user info from Google');
-        }
-        
-        const userInfo: GoogleUserInfo = await response.json();
-        console.log('👤 User Info:', userInfo);
-        
-        // Map Google user info to the format expected by handleAuthLogin
-        const googleUserData = {
-          email: userInfo.email,
-          name: userInfo.name,
-          picture: userInfo.picture,
-          sub: userInfo.sub,
-        };
-        
-        // Call AuthContext handler to process the login (fetches Circle data)
-        await handleAuthLogin(googleUserData);
-        
-        // Redirect to dashboard
-        navigate('/dashboard', { replace: true });
-        
-      } catch (error: any) {
-        console.error('❌ Error:', error);
-        setMessage({ type: 'error', text: error.message || 'Failed to complete login. Please try again.' });
-        setLoading(false);
-      }
-    },
-    onError: (error) => {
-      console.error('❌ Google Login Failed:', error);
-      setMessage({ type: 'error', text: 'Google login failed. Please try again.' });
-      setLoading(false);
-    },
-  });
+  // Initialize Google Sign-In
+  useEffect(() => {
+    console.log("🔄 Initializing Google Sign-In...");
+    console.log("✅ Google Client ID found:", GOOGLE_CLIENT_ID ? 'Yes' : 'No');
 
-  // Fallback manual OAuth flow (if useGoogleLogin fails)
-  const handleManualGoogleSignIn = () => {
-    console.log('🔄 Using manual Google Sign-In fallback');
-    setLoading(true);
-    setMessage(null);
-
-    const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    
     if (!GOOGLE_CLIENT_ID) {
       setMessage({ 
         type: 'error', 
-        text: 'Google Sign-In is not configured. Please contact support.' 
-      });
-      setLoading(false);
-      return;
-    }
-
-    // OAuth 2.0 endpoint
-    const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
-    
-    // Build the OAuth URL
-    const params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: `${window.location.origin}/auth/callback`,
-      response_type: 'code',
-      scope: 'openid email profile',
-      access_type: 'offline',
-      prompt: 'consent',
-      state: Math.random().toString(36).substring(7), // Random state for security
-    });
-
-    // Redirect to Google OAuth
-    const authUrl = `${googleAuthUrl}?${params.toString()}`;
-    console.log('🔄 Redirecting to Google OAuth:', authUrl);
-    window.location.href = authUrl;
-  };
-
-  // Handle button click with error handling
-  const handleButtonClick = () => {
-    console.log('🖱️ Sign in button clicked');
-    console.log('📊 Client ID Ready:', clientIdReady);
-    console.log('📊 Loading:', loading);
-    
-    if (loading) {
-      console.log('⏳ Already processing, ignoring click');
-      return;
-    }
-
-    if (!clientIdReady) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Google Sign-In is not configured. Please contact support.' 
+        text: 'Google Sign-In is not configured properly.' 
       });
       return;
     }
 
-    try {
-      // Try the useGoogleLogin hook first
-      login();
-    } catch (error) {
-      console.error('❌ Error calling login function:', error);
-      // Fallback to manual OAuth
-      handleManualGoogleSignIn();
+    // Load Google Identity Services script
+    const loadGoogleScript = () => {
+      // Check if script already exists
+      const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+      
+      if (existingScript) {
+        console.log("✅ Google script already loaded");
+        initializeGoogleSignIn();
+        return;
+      }
+
+      console.log("📥 Loading Google Identity Services script...");
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      
+      script.onload = () => {
+        console.log("✅ Google script loaded successfully");
+        initializeGoogleSignIn();
+      };
+
+      script.onerror = () => {
+        console.error("❌ Failed to load Google script");
+        setMessage({ type: 'error', text: 'Failed to load Google Sign-In. Please refresh the page.' });
+      };
+
+      document.body.appendChild(script);
+    };
+
+    const initializeGoogleSignIn = () => {
+      // Wait for google object to be available
+      const checkGoogle = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          clearInterval(checkGoogle);
+          
+          console.log("🔧 Initializing Google accounts...");
+          
+          try {
+            window.google.accounts.id.initialize({
+              client_id: GOOGLE_CLIENT_ID,
+              callback: window.handleCredentialResponse,
+              auto_select: false,
+              cancel_on_tap_outside: true,
+              context: 'signin',
+              ux_mode: 'popup',
+              itp_support: true
+            });
+
+            console.log("✅ Google accounts initialized");
+            
+            // Render the button
+            if (googleButtonRef.current) {
+              console.log("🎨 Rendering Google button...");
+              
+              window.google.accounts.id.renderButton(
+                googleButtonRef.current,
+                {
+                  type: 'standard',
+                  theme: 'outline',
+                  size: 'large',
+                  text: 'signin_with',
+                  shape: 'rectangular',
+                  logo_alignment: 'left',
+                  width: 280
+                }
+              );
+              
+              console.log("✅ Google button rendered");
+              setGoogleLoaded(true);
+            }
+          } catch (err) {
+            console.error("❌ Error initializing Google Sign-In:", err);
+            setMessage({ type: 'error', text: 'Failed to initialize Google Sign-In' });
+          }
+        }
+      }, 100);
+
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        clearInterval(checkGoogle);
+        if (!window.google?.accounts?.id) {
+          console.error("❌ Google Sign-In failed to load after 5 seconds");
+          setMessage({ type: 'error', text: 'Google Sign-In took too long to load. Please refresh.' });
+        }
+      }, 5000);
+    };
+
+    loadGoogleScript();
+  }, [GOOGLE_CLIENT_ID]);
+
+  // Manual fallback login method
+  const handleManualSignIn = () => {
+    console.log("🔄 Manual sign-in triggered");
+    
+    if (!GOOGLE_CLIENT_ID) {
+      setMessage({ type: 'error', text: 'Google Sign-In is not configured.' });
+      return;
+    }
+
+    setLoading(true);
+    
+    // Try to trigger Google prompt
+    if (window.google?.accounts?.id) {
+      console.log("📤 Triggering Google One Tap...");
+      window.google.accounts.id.prompt();
+    } else {
+      // Fallback to OAuth redirect
+      console.log("🔄 Falling back to OAuth redirect...");
+      
+      const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: `${window.location.origin}/auth/callback`,
+        response_type: 'code',
+        scope: 'openid email profile',
+        access_type: 'offline',
+        prompt: 'select_account'
+      });
+
+      window.location.href = `${authUrl}?${params.toString()}`;
     }
   };
 
@@ -201,11 +259,23 @@ const Auth = () => {
               </div>
             )}
 
+            {/* Google Identity Services Button */}
+            <div 
+              ref={googleButtonRef}
+              id="googleButton"
+              className="flex justify-center min-h-[44px] w-full"
+            >
+              {!googleLoaded && !loading && (
+                <div className="text-muted-foreground text-sm">Loading Google Sign-In...</div>
+              )}
+            </div>
+
+            {/* Manual Fallback Button */}
             <button
-              onClick={handleButtonClick}
-              disabled={loading || !clientIdReady}
+              onClick={handleManualSignIn}
+              disabled={loading}
               className={`w-full bg-white hover:bg-gray-50 text-gray-800 font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 border border-gray-300 shadow-lg hover:shadow-xl ${
-                loading || !clientIdReady ? 'opacity-50 cursor-not-allowed' : ''
+                loading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
               type="button"
             >
@@ -225,7 +295,7 @@ const Auth = () => {
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
-                  <span>Sign in with Google</span>
+                  <span>Sign in with Google (Alternative)</span>
                 </>
               )}
             </button>
