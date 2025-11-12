@@ -619,7 +619,7 @@ const Landing = () => {
               </Link>
             ) : (
               <button
-                onClick={loginWithGoogle}
+                onClick={() => navigate('/auth')}
                 className="btn-premium inline-flex items-center justify-center gap-3 px-12 py-6 text-xl font-bold rounded-full hover-glow animate-cta-magnetic"
               >
                 <Rocket className="w-6 h-6" />
