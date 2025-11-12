@@ -481,8 +481,9 @@ app.get('/api/member-spaces', (req, res) => {
 // This allows the backend to serve the React app for SPA routing
 // CRITICAL: This is registered AFTER all API routes to ensure API routes are matched first
 
-// Only set up static file serving in production
-if (process.env.NODE_ENV === 'production') {
+// Only set up static file serving in production AND when not on Vercel
+// On Vercel, static files are served separately, so we don't need this
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const frontendDistPath = path.resolve(__dirname, '../dist');
   const fs = require('fs'); // Use require for synchronous check
   
@@ -550,13 +551,25 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // ============================================================================
-// START SERVER
+// EXPORT FOR VERCEL SERVERLESS FUNCTION
 // ============================================================================
-app.listen(PORT, () => {
-  console.log(`🚀 API server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✓ Configured' : '✗ Missing'}`);
-  console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com'}`);
-  console.log(`🍪 Session Secret: ${process.env.SESSION_SECRET ? '✓ Set' : '✗ Using default'}`);
-  console.log(`📡 Server ready to accept requests`);
-});
+// Export the app as default for Vercel serverless functions
+// Vercel will use this as the handler for all API routes
+export default app;
+
+// ============================================================================
+// START SERVER (Only if not running on Vercel)
+// ============================================================================
+// If running locally or on a non-Vercel platform, start the server normally
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 API server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✓ Configured' : '✗ Missing'}`);
+    console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com'}`);
+    console.log(`🍪 Session Secret: ${process.env.SESSION_SECRET ? '✓ Set' : '✗ Using default'}`);
+    console.log(`📡 Server ready to accept requests`);
+  });
+} else {
+  console.log('✅ Running on Vercel - app exported as serverless function');
+}

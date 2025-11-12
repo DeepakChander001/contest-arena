@@ -1,8 +1,25 @@
 {
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/server.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/backend/server.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://your-backend-server.1to10x.com/api/$1"
+      "destination": "/backend/server.ts"
     },
     {
       "source": "/(.*)",
