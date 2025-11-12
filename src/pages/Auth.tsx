@@ -21,11 +21,75 @@ const Auth = () => {
   
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
+  // Fetch Circle member data (optional, non-blocking)
+  const fetchCircleMemberData = async (email: string) => {
+    try {
+      const CIRCLE_API_KEY = import.meta.env.VITE_CIRCLE_API_KEY;
+      const CIRCLE_COMMUNITY_ID = import.meta.env.VITE_CIRCLE_COMMUNITY_ID;
+      
+      if (!CIRCLE_API_KEY || !CIRCLE_COMMUNITY_ID) {
+        console.log('ℹ️ Circle.so not configured, skipping member fetch');
+        return;
+      }
+
+      console.log('🔄 Fetching Circle member data...');
+      
+      // Use the correct Circle API endpoint
+      const response = await fetch(`https://app.circle.so/api/v1/community_members?community_id=${CIRCLE_COMMUNITY_ID}&email=${encodeURIComponent(email)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${CIRCLE_API_KEY}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Check response
+      if (!response.ok) {
+        console.warn(`⚠️ Circle API returned status ${response.status}`);
+        
+        // Check if it's a CORS or network error
+        if (response.status === 0) {
+          console.log('ℹ️ Circle API blocked by CORS - this is expected for client-side calls');
+          // You might need to make this call from your backend instead
+          return;
+        }
+        
+        return;
+      }
+
+      // Check content type
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        console.warn('⚠️ Circle API returned non-JSON response');
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        console.log('✅ Circle member found');
+        localStorage.setItem('circle_member', JSON.stringify(data[0]));
+      } else {
+        console.log('ℹ️ User not found in Circle community');
+      }
+      
+    } catch (error) {
+      // Don't block sign-in for Circle errors
+      console.log('ℹ️ Circle member fetch failed (non-blocking):', error);
+    }
+  };
+
   // Handle Google callback - make it available globally and stable with useCallback
-  const handleGoogleCallback = useCallback((response: any) => {
+  const handleGoogleCallback = useCallback(async (response: any) => {
     console.log('🎯 Google callback triggered!');
-    console.log('Response:', response);
     
+    // Handle FedCM abort gracefully
+    if (response.error === 'user_cancel' || response.error === 'popup_closed') {
+      console.log('User cancelled sign-in');
+      return;
+    }
+
     if (response.error) {
       console.error('❌ Google Sign-In error:', response.error);
       setMessage({ type: 'error', text: `Sign-in failed: ${response.error}` });
@@ -57,8 +121,8 @@ const Auth = () => {
       const userInfo = JSON.parse(jsonPayload);
       console.log('✅ User authenticated:', userInfo.email);
 
-      // Save basic user data first (before Circle API call)
-      const basicUserData = {
+      // Save basic user data first
+      const userData = {
         email: userInfo.email,
         name: userInfo.name,
         picture: userInfo.picture,
@@ -67,8 +131,11 @@ const Auth = () => {
         loginTime: new Date().toISOString()
       };
 
-      localStorage.setItem('user', JSON.stringify(basicUserData));
+      localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('google_credential', credential);
+
+      // Try to fetch Circle member data (optional, non-blocking)
+      await fetchCircleMemberData(userInfo.email);
 
       // Map to format expected by AuthContext
       const googleUserData = {
@@ -79,34 +146,33 @@ const Auth = () => {
       };
 
       // Try to process login with Circle data (with graceful fallback)
-      handleAuthLogin(googleUserData)
-        .then(() => {
-          // If successful, redirect will happen in handleAuthLogin
-          console.log('✅ Login processed successfully');
-        })
-        .catch((circleError: any) => {
-          console.warn('⚠️ Circle API error, continuing with basic Google data:', circleError);
-          
-          // Check if it's a "not found" error - redirect to profile creation
-          if (circleError?.message?.includes('not found') || 
-              circleError?.message?.includes('404') || 
-              circleError?.notFound) {
-            console.log('⚠️ User not found in Circle, redirecting to profile creation');
-            window.location.href = `/create-profile?email=${encodeURIComponent(userInfo.email)}&name=${encodeURIComponent(userInfo.name || '')}`;
-            return;
-          }
-          
-          // For other errors (like HTML responses), continue with basic data
-          console.log('⚠️ Circle API returned error, using basic Google data');
-          // User data already saved, just redirect to dashboard
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 500);
-        });
+      try {
+        await handleAuthLogin(googleUserData);
+        // If successful, redirect will happen in handleAuthLogin
+        console.log('✅ Login processed successfully');
+      } catch (circleError: any) {
+        console.warn('⚠️ Circle API error, continuing with basic Google data:', circleError);
+        
+        // Check if it's a "not found" error - redirect to profile creation
+        if (circleError?.message?.includes('not found') || 
+            circleError?.message?.includes('404') || 
+            circleError?.notFound) {
+          console.log('⚠️ User not found in Circle, redirecting to profile creation');
+          window.location.href = `/create-profile?email=${encodeURIComponent(userInfo.email)}&name=${encodeURIComponent(userInfo.name || '')}`;
+          return;
+        }
+        
+        // For other errors (like HTML responses), continue with basic data
+        console.log('⚠️ Circle API returned error, using basic Google data');
+        // User data already saved, just redirect to dashboard
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 500);
+      }
       
     } catch (err: any) {
-      console.error('❌ Error processing credential:', err);
-      setMessage({ type: 'error', text: err.message || 'Failed to process sign-in. Please try again.' });
+      console.error('❌ Error processing sign-in:', err);
+      setMessage({ type: 'error', text: err.message || 'Failed to complete sign-in. Please try again.' });
       setLoading(false);
     }
   }, [handleAuthLogin]);
@@ -244,20 +310,21 @@ const Auth = () => {
     };
 
     const initializeGoogleSignIn = () => {
-      if (!googleButtonRef.current || !isMounted) {
-        console.log('❌ Button ref not ready or component unmounted');
+      if (!window.google?.accounts?.id || !googleButtonRef.current || !isMounted) {
+        // Retry if Google object not ready yet
+        setTimeout(() => {
+          if (isMounted) initializeGoogleSignIn();
+        }, 500);
         return;
       }
 
       try {
         console.log('🔧 Initializing Google Sign-In...');
-        console.log('Using Client ID:', GOOGLE_CLIENT_ID);
-        console.log('Global callback available:', !!window.handleGoogleCallback);
         
-        // Clear any existing content
+        // Clear container
         googleButtonRef.current.innerHTML = '';
 
-        // Initialize Google Sign-In with global callback
+        // Initialize Google Sign-In with global callback and FedCM support
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: window.handleGoogleCallback, // Use global callback
@@ -265,7 +332,8 @@ const Auth = () => {
           cancel_on_tap_outside: true,
           context: 'signin',
           ux_mode: 'popup',
-          itp_support: true
+          itp_support: true,
+          use_fedcm_for_prompt: true // Enable FedCM (Federated Credential Management)
         });
 
         console.log('🎨 Rendering button...');
@@ -288,9 +356,15 @@ const Auth = () => {
         setButtonReady(true);
         console.log('✅ Google Sign-In button ready!');
 
-        // Optional: Enable One Tap
+        // Optional: Try One Tap (with FedCM)
         window.google.accounts.id.prompt((notification: any) => {
-          console.log('📱 One Tap status:', notification?.getMomentType?.() || notification);
+          if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+            // One Tap not shown or skipped
+            const reason = notification.getNotDisplayedReason?.() || notification.getSkippedReason?.();
+            console.log('One Tap not shown:', reason);
+          } else {
+            console.log('📱 One Tap status:', notification?.getMomentType?.() || notification);
+          }
         });
         
         // Debug: Check if button is actually rendered
