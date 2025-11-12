@@ -67,7 +67,7 @@ const MyProgress = () => {
     if (!user) return false;
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/refresh-session`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com'}/api/refresh-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +112,7 @@ const MyProgress = () => {
         // Refresh session first to ensure authentication
         await refreshSession();
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/progress`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com'}/api/progress`, {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
@@ -593,9 +593,9 @@ const MyProgress = () => {
       </div>
 
       {/* Recent Activities */}
-      <Card>
+      <Card className="glass-card-premium hover-glow">
         <CardHeader>
-          <CardTitle>Recent Activities</CardTitle>
+          <CardTitle className="gradient-text">Recent Activities</CardTitle>
           <CardDescription>Your latest XP-earning activities</CardDescription>
         </CardHeader>
         <CardContent>

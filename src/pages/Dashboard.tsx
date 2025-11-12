@@ -1,17 +1,206 @@
-import { Flame, TrendingUp, Award } from "lucide-react";
+import { Flame, TrendingUp, Award, Loader2 } from "lucide-react";
 import { LevelProgress } from "@/components/LevelProgress";
 import { ContestCard } from "@/components/ContestCard";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState, useRef } from "react";
 
 const Dashboard = () => {
-  // Mock data - will be replaced with real API calls
-  const userData = {
-    level: 6,
-    currentXP: 2847,
-    nextLevelXP: 4000,
-    monthlyXP: [120, 230, 180, 290, 310, 260, 340],
-    streak: 12,
+  const { user, isLoading, refreshUserData } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+
+  console.log('🏠 Dashboard component loaded');
+  console.log('🏠 User:', user);
+  console.log('🏠 IsLoading:', isLoading);
+
+  // Generate mock monthly XP data for chart (would come from real data)
+  const monthlyXP = [120, 230, 180, 290, 310, 260, 340];
+
+  useEffect(() => {
+    // Refresh user data when component mounts
+    if (user) {
+      refreshUserData();
+    }
+  }, []);
+
+  // Add session refresh function like in DailyRewards
+  const refreshSession = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com'}/api/refresh-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userData: {
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            googleId: user?.id,
+            googleName: user?.name,
+            avatarUrl: user?.avatarUrl
+          }
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Dashboard session refreshed successfully');
+        return true;
+      } else {
+        console.error('❌ Failed to refresh dashboard session');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing dashboard session:', error);
+      return false;
+    }
   };
+
+  useEffect(() => {
+    // Refresh session when dashboard loads
+    if (user) {
+      refreshSession();
+    }
+  }, [user]);
+
+  // Fetch dashboard data from API
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoadingData(true);
+      
+      // First refresh the session
+      await refreshSession();
+      
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
+      const response = await fetch(`${apiUrl}/api/dashboard`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDashboardData(data);
+        console.log('✅ Dashboard data loaded:', data);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Failed to fetch dashboard data:', response.status, response.statusText);
+        console.error('❌ Error details:', errorText);
+        
+        // If 404, the endpoint might not exist - use mock data as fallback
+        if (response.status === 404) {
+          console.warn('⚠️ Dashboard endpoint not found, using fallback data');
+          setDashboardData({
+            user: {
+              name: user?.name || 'User',
+              email: user?.email || '',
+              avatarUrl: user?.avatarUrl || null,
+              currentXP: user?.currentXP || 0,
+              level: user?.level || 1,
+              nextLevelXP: user?.nextLevelXP || 1000,
+              streak: user?.streak || 0,
+              totalContests: 0,
+              winRate: 0
+            },
+            contests: [],
+            stats: {
+              monthlyXP: [],
+              recentActivity: []
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching dashboard data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    // Fetch dashboard data when user is available
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshUserData();
+      await fetchDashboardData();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Show loading state - Wait for AuthContext to finish loading
+  // This is critical - don't check for user until loading is complete
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only check for user AFTER loading is complete
+  // Give it a moment to ensure state has propagated
+  if (!user) {
+    // Check localStorage as fallback - if it exists, wait a moment for state to sync
+    const storedUser = localStorage.getItem('10x-contest-user');
+    if (storedUser) {
+      // User exists in localStorage but not in state - wait a moment
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground">Setting up your dashboard...</p>
+          </div>
+        </div>
+      );
+    }
+    
+    // No user found - show login prompt
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-bold">Please log in to view your dashboard</h2>
+          <Button onClick={() => window.location.href = '/auth'}>
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Add a simple test to make sure the component renders
+  console.log('🏠 Dashboard rendering with user:', user);
+  console.log('🏠 Dashboard data:', dashboardData);
+  console.log('🏠 IsLoadingData:', isLoadingData);
+
+  // Show loading state for dashboard data
+  if (isLoadingData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Use dashboard data if available, otherwise use user data as fallback
+  const displayUser = dashboardData?.user || user;
+  const displayContests = dashboardData?.contests || [];
 
   const activeContests = [
     {
@@ -58,34 +247,55 @@ const Dashboard = () => {
   ];
 
   const stats = [
-    { label: "Total Contests", value: "24", trend: "+3" },
-    { label: "Win Rate", value: "31%", trend: "+5%" },
-    { label: "Average Rank", value: "4.2", trend: "-0.3" },
-    { label: "Badges Earned", value: "8/22", progress: 36 },
+    { label: "Posts Created", value: (displayUser.postsCount || 0).toString(), trend: "+1" },
+    { label: "Comments Made", value: (displayUser.commentsCount || 0).toString(), trend: "+0" },
+    { label: "Activity Score", value: (displayUser.activityScore || 0).toString(), trend: "+0.2" },
+    { label: "Badges Earned", value: `${(displayUser.badges?.filter((b: any) => b.earned).length || 0)}/22`, progress: Math.round(((displayUser.badges?.filter((b: any) => b.earned).length || 0) / 22) * 100) },
   ];
 
   return (
-    <div className="min-h-screen p-8 space-y-10 animate-fade-in">
-      {/* Hero Section - Redesigned with Glassmorphism */}
-      <div className="glass-card-hero p-10">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
+    <div className="min-h-screen p-8 space-y-12 animate-fade-in">
+      {/* Header with refresh button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">Welcome back, {user?.name || 'User'}!</h1>
+          <p className="text-muted-foreground">Here's your progress overview</p>
+        </div>
+        <Button 
+          onClick={handleRefresh} 
+          disabled={isRefreshing}
+          variant="outline"
+          className="flex items-center gap-2 hover-glow btn-premium"
+        >
+          {isRefreshing ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <TrendingUp className="w-4 h-4" />
+          )}
+          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+        </Button>
+      </div>
+
+      {/* Hero Stats Card - Full Width - PREMIUM ENHANCEMENT */}
+      <div className="glass-card-premium p-8 rounded-xl shadow-lg card-shimmer hover-glow">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
           {/* Left: Level Progress */}
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center lg:items-start gap-6">
             <LevelProgress
-              currentLevel={userData.level}
-              currentXP={userData.currentXP}
-              nextLevelXP={userData.nextLevelXP}
+              currentLevel={displayUser.level || 1}
+              currentXP={displayUser.currentXP || displayUser.totalXP || 0}
+              nextLevelXP={displayUser.nextLevelXP || 1000}
               size="lg"
             />
-            <div className="text-center">
-              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+            <div className="text-center lg:text-left">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
                 XP Trend (7 Days)
               </div>
-              <div className="flex gap-1 items-end justify-center h-12">
-                {userData.monthlyXP.map((xp, i) => (
+              <div className="flex gap-1 items-end justify-center lg:justify-start h-12">
+                {monthlyXP.map((xp, i) => (
                   <div
                     key={i}
-                    className="w-4 bg-gradient-to-t from-primary to-cyan-400 rounded-t"
+                    className="w-4 bg-gradient-to-t from-primary to-cyan-400 rounded-t transition-all duration-300 hover:scale-110"
                     style={{ height: `${(xp / 340) * 100}%` }}
                   />
                 ))}
@@ -93,42 +303,47 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Right: XP Stats */}
-          <div className="flex-1 space-y-6">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+          {/* Center: Current XP */}
+          <div className="text-center">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
                 Current XP
               </div>
-              <div className="font-mono text-7xl font-bold glow-text tracking-tight">
-                {userData.currentXP.toLocaleString()}
+            <div className="font-mono text-6xl lg:text-7xl font-bold gradient-text tracking-tight mb-3">
+              {(displayUser.currentXP || displayUser.totalXP || 0).toLocaleString()}
               </div>
-              <div className="text-sm text-success glow-success mt-2 flex items-center gap-2">
+            <div className="text-sm text-success glow-success flex items-center justify-center gap-2">
                 <TrendingUp className="w-4 h-4" />
-                <span className="font-semibold">+340 this month</span>
+              <span className="font-semibold">+{Math.floor((displayUser.currentXP || displayUser.totalXP || 0) * 0.1)} this month</span>
               </div>
             </div>
 
+          {/* Right: Progress & Streak */}
+          <div className="space-y-6">
             <div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
                 To Next Level
               </div>
-              <div className="font-mono text-3xl font-bold text-primary">
-                {(userData.nextLevelXP - userData.currentXP).toLocaleString()} XP
+              <div className="font-mono text-3xl font-bold text-primary mb-3">
+                {(displayUser.nextLevelXP || 1000).toLocaleString()} XP
               </div>
-              <div className="mt-3 h-3 bg-black/50 rounded-full overflow-hidden border border-primary/20">
+              <div className="h-3 bg-black/50 rounded-full overflow-hidden border border-primary/20">
                 <div
                   className="h-full animated-gradient transition-all duration-500"
-                  style={{ width: `${(userData.currentXP / userData.nextLevelXP) * 100}%` }}
+                  style={{ width: `${((displayUser.currentXP || displayUser.totalXP || 0) / (displayUser.nextLevelXP || 1000)) * 100}%` }}
                 />
               </div>
             </div>
 
-            <div className="glass-card p-4 inline-flex items-center gap-3 animate-pulse-glow">
-              <Flame className="w-6 h-6 text-warning" />
+            <div className="stat-card-premium glass-card p-6 rounded-xl shadow-lg hover:scale-105 transition-all duration-300 animate-pulse-glow hover-glow">
+              <div className="flex items-center gap-4">
+                <div className="icon-gradient">
+                  <Flame className="w-8 h-8 text-warning" />
+                </div>
               <div>
-                <div className="font-mono text-2xl font-bold">{userData.streak}</div>
+                  <div className="font-mono text-3xl font-bold">{displayUser.streak || 0}</div>
                 <div className="text-xs text-muted-foreground uppercase tracking-wide">
                   Day Streak
+                  </div>
                 </div>
               </div>
             </div>
@@ -136,23 +351,25 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Active Contests */}
+      {/* Three Column Grid - Equal Widths */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Column 1: Available Contests */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-              Available Contests
-            </h3>
-            <Button variant="ghost" size="sm" className="hover-lift">
+            <h3 className="text-2xl font-bold text-white">Available Contests</h3>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:scale-105"
+            >
               View All →
             </Button>
           </div>
-          <div className="space-y-4">
-            {activeContests.map((contest, index) => (
+          <div className="space-y-6">
+            {(displayContests.length > 0 ? displayContests : activeContests).map((contest, index) => (
               <div
                 key={contest.id}
-                className="animate-slide-in-right"
+                className="transform hover:-translate-y-1 transition-all duration-300 hover:shadow-xl"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <ContestCard {...contest} />
@@ -161,31 +378,29 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Activity Feed - Timeline Design */}
+        {/* Column 2: Recent Activity */}
         <div className="space-y-6">
-          <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-            Recent Activity
-          </h3>
-          <div className="glass-card p-8 relative">
+          <h3 className="text-2xl font-bold text-white">Recent Activity</h3>
+          <div className="glass-card-premium p-8 rounded-xl shadow-lg relative hover-glow">
             <div className="timeline-line" />
             <div className="space-y-6 relative pl-8">
               {activityFeed.map((activity, idx) => (
                 <div
                   key={idx}
-                  className="group hover-lift rounded-lg p-3 -ml-3 hover:bg-white/5 cursor-pointer"
+                  className="group hover:bg-white/5 rounded-lg p-4 -ml-4 cursor-pointer transition-all duration-300 hover:scale-105"
                   style={{ animationDelay: `${idx * 100}ms` }}
                 >
                   <div className="flex gap-4 items-start">
-                    <div className="timeline-dot absolute left-0 top-5" />
-                    <div className="icon-gradient flex-shrink-0">
+                    <div className="timeline-dot absolute left-0 top-6" />
+                    <div className="icon-gradient flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center">
                       {activity.type === 'submit' && <Award className="w-4 h-4 text-white" />}
                       {activity.type === 'badge' && <Award className="w-4 h-4 text-white" />}
                       {activity.type === 'level' && <TrendingUp className="w-4 h-4 text-white" />}
                       {activity.type === 'social' && <Award className="w-4 h-4 text-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{activity.text}</p>
-                      <p className="text-xs text-muted-foreground mt-1 opacity-60">
+                      <p className="text-sm font-medium text-white">{activity.text}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
                         {activity.time}
                       </p>
                     </div>
@@ -196,20 +411,18 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Quick Stats - Enhanced with Icons */}
+        {/* Column 3: Quick Stats */}
         <div className="space-y-6">
-          <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-            Quick Stats
-          </h3>
-          <div className="space-y-4">
+          <h3 className="text-2xl font-bold text-white">Quick Stats</h3>
+        <div className="space-y-6">
             {stats.map((stat, idx) => (
               <div
                 key={idx}
-                className="glass-card-elevated p-6 hover-lift cursor-pointer"
+                className="stat-card-premium glass-card p-6 rounded-xl shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer hover-glow"
                 style={{ animationDelay: `${idx * 100}ms` }}
               >
                 <div className="flex items-start gap-4">
-                  <div className="icon-gradient">
+                  <div className="icon-gradient w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
                     {idx === 0 && <Award className="w-5 h-5 text-white" />}
                     {idx === 1 && <TrendingUp className="w-5 h-5 text-white" />}
                     {idx === 2 && <Award className="w-5 h-5 text-white" />}
@@ -217,7 +430,7 @@ const Dashboard = () => {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs uppercase tracking-widest text-muted-foreground opacity-60">
+                      <span className="text-xs uppercase tracking-widest text-muted-foreground">
                         {stat.label}
                       </span>
                       {stat.trend && (
@@ -230,11 +443,11 @@ const Dashboard = () => {
                         </span>
                       )}
                     </div>
-                    <div className="font-mono text-4xl font-bold tracking-tight glow-text">
+                    <div className="font-mono text-4xl font-bold tracking-tight glow-text mb-3">
                       {stat.value}
                     </div>
                     {stat.progress !== undefined && (
-                      <div className="mt-3 h-2 bg-black/50 rounded-full overflow-hidden border border-primary/20">
+                      <div className="h-2 bg-black/50 rounded-full overflow-hidden border border-primary/20">
                         <div
                           className="h-full animated-gradient transition-all duration-500"
                           style={{ width: `${stat.progress}%` }}
@@ -247,18 +460,18 @@ const Dashboard = () => {
             ))}
           </div>
 
-          {/* Motivation Box - Enhanced */}
-          <div className="glass-card-elevated p-8 gradient-border hover-lift">
+          {/* Top Performer Card - PREMIUM ENHANCEMENT */}
+          <div className="glass-card-premium p-8 rounded-xl shadow-lg border-gradient hover:scale-105 transition-all duration-300 hover-glow card-shimmer">
             <div className="flex items-center gap-3 mb-6">
-              <div className="icon-gradient">
+              <div className="icon-gradient w-10 h-10 rounded-full flex items-center justify-center">
                 <Award className="w-5 h-5 text-white" />
               </div>
-              <h4 className="font-bold text-lg">Top Performer</h4>
+              <h4 className="font-bold text-lg text-white">Top Performer</h4>
             </div>
             <div className="flex items-center gap-4 mb-6">
               <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-cyan-400 animate-pulse-glow" />
               <div>
-                <p className="font-bold text-lg">Sarah Kumar</p>
+                <p className="font-bold text-lg text-white">Sarah Kumar</p>
                 <p className="text-sm text-muted-foreground">Level 8 • 4,892 XP</p>
               </div>
             </div>

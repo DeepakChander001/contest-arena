@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown, Menu, X, Zap } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Navbar = () => {
-  const [showDashboardMenu, setShowDashboardMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const { user, logout, isAuthenticated, loginWithGoogle } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -30,23 +31,6 @@ export const Navbar = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const navLinks = [
-    { path: "/", label: "Home" },
-    { path: "/contests", label: "Contests" },
-    { path: "/leaderboard", label: "Leaderboard" },
-    { path: "/giveaways", label: "Prizes" },
-    { path: "/leap", label: "LEAP" },
-  ];
-
-  const dashboardLinks = [
-    { path: "/dashboard", label: "Overview", icon: "🏠" },
-    { path: "/contests", label: "Contests", icon: "🏆" },
-    { path: "/leaderboard", label: "Leaderboard", icon: "📊" },
-    { path: "/progress", label: "My Progress", icon: "📈" },
-    { path: "/giveaways", label: "Giveaways", icon: "🎁" },
-    { path: "/leap", label: "LEAP Challenge", icon: "⚡" },
-    { path: "/badges", label: "My Badges", icon: "🎖️" },
-  ];
 
   return (
     <>
@@ -60,109 +44,129 @@ export const Navbar = () => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-[70px]">
             
-            {/* Logo */}
+            {/* Logo - Text Only */}
             <Link 
               to="/"
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity group"
+              className="text-xl font-bold hover:opacity-80 transition-opacity"
             >
-              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Zap className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold hidden sm:block">10X Contest Arena</span>
+              1to10x Contest Arena
             </Link>
             
-            {/* Desktop Navigation */}
+            {/* Desktop Navigation - Only 3 items */}
             <div className="hidden md:flex items-center gap-8">
-              
-              {navLinks.map((link) => (
-                <Link 
-                  key={link.path}
-                  to={link.path}
-                  className={`
-                    nav-link font-medium transition-all relative
-                    ${isActive(link.path) 
-                      ? 'text-cyan-400' 
-                      : 'text-white hover:text-cyan-400'
-                    }
-                  `}
-                >
-                  {link.label}
-                  {isActive(link.path) && (
-                    <span className="absolute -bottom-[21px] left-0 right-0 h-0.5 bg-cyan-400" />
-                  )}
-                </Link>
-              ))}
-              
-              {/* Dashboard Dropdown */}
-              <div 
-                className="relative"
-                onMouseEnter={() => setShowDashboardMenu(true)}
-                onMouseLeave={() => setShowDashboardMenu(false)}
+              <Link 
+                to="/"
+                className={`
+                  nav-link font-medium transition-all relative
+                  ${isActive('/') 
+                    ? 'text-cyan-400' 
+                    : 'text-white hover:text-cyan-400'
+                  }
+                `}
               >
-                <button className="
-                  flex items-center gap-2 
-                  font-medium text-white hover:text-cyan-400
-                  transition-colors nav-link
-                ">
-                  Dashboard
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showDashboardMenu ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showDashboardMenu && (
-                  <div className="
-                    absolute top-full left-0 mt-2
-                    w-56 bg-zinc-900/95 backdrop-blur-lg
-                    rounded-lg border border-white/10
-                    shadow-2xl shadow-cyan-500/10
-                    overflow-hidden
-                    animate-slide-down
-                  ">
-                    {dashboardLinks.map((link) => (
-                      <Link 
-                        key={link.path}
-                        to={link.path} 
-                        className="nav-dropdown-item flex items-center gap-3"
-                      >
-                        <span>{link.icon}</span>
-                        <span>{link.label}</span>
-                      </Link>
-                    ))}
-                  </div>
+                Home
+                {isActive('/') && (
+                  <span className="absolute -bottom-[21px] left-0 right-0 h-0.5 bg-cyan-400" />
                 )}
-              </div>
+              </Link>
+              
+              <Link 
+                to="/daily-rewards"
+                className={`
+                  nav-link font-medium transition-all relative
+                  ${isActive('/daily-rewards') 
+                    ? 'text-cyan-400' 
+                    : 'text-white hover:text-cyan-400'
+                  }
+                `}
+              >
+                Daily Rewards
+                {isActive('/daily-rewards') && (
+                  <span className="absolute -bottom-[21px] left-0 right-0 h-0.5 bg-cyan-400" />
+                )}
+              </Link>
+              
+              <Link 
+                to="/dashboard"
+                className={`
+                  nav-link font-medium transition-all relative
+                  ${isActive('/dashboard') 
+                    ? 'text-cyan-400' 
+                    : 'text-white hover:text-cyan-400'
+                  }
+                `}
+              >
+                Dashboard
+                {isActive('/dashboard') && (
+                  <span className="absolute -bottom-[21px] left-0 right-0 h-0.5 bg-cyan-400" />
+                )}
+              </Link>
             </div>
             
             {/* Profile Section */}
             <div className="hidden md:flex items-center gap-4">
-              {/* XP Display */}
-              <div className="text-cyan-400 font-mono font-bold text-sm">
-                2,847 XP
-              </div>
+              {isAuthenticated ? (
+                <>
+                  {/* XP Display */}
+                  <div className="text-cyan-400 font-mono font-bold text-sm">
+                    {(user?.currentXP ?? 0).toLocaleString()} XP
+                  </div>
+                  
+                  {/* Level Badge */}
+                  <div className="
+                    w-10 h-10 rounded-full
+                    bg-gradient-to-br from-cyan-500 to-blue-500
+                    flex items-center justify-center
+                    font-bold text-sm
+                    shadow-lg shadow-cyan-500/30
+                  ">
+                    {user?.level ?? 1}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Login Button */}
+                  <button
+                    onClick={loginWithGoogle}
+                    className="
+                      px-4 py-2
+                      bg-gradient-to-r from-cyan-500 to-blue-500
+                      text-white font-semibold text-sm
+                      rounded-lg
+                      hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/30
+                      transition-all duration-300
+                    "
+                  >
+                    Login
+                  </button>
+                </>
+              )}
               
-              {/* Level Badge */}
-              <div className="
-                w-10 h-10 rounded-full
-                bg-gradient-to-br from-cyan-500 to-blue-500
-                flex items-center justify-center
-                font-bold text-sm
-                shadow-lg shadow-cyan-500/30
-              ">
-                6
-              </div>
-              
-              {/* Avatar with Dropdown */}
-              <div 
-                className="relative"
-                onMouseEnter={() => setShowProfileMenu(true)}
-                onMouseLeave={() => setShowProfileMenu(false)}
-              >
+              {/* Avatar with Dropdown - Only show when authenticated */}
+              {isAuthenticated && (
+                <div 
+                  className="relative"
+                  onMouseEnter={() => setShowProfileMenu(true)}
+                  onMouseLeave={() => setShowProfileMenu(false)}
+                >
                 <button className="
                   w-10 h-10 rounded-full bg-gradient-to-br from-cyan-600 to-blue-600
-                  flex items-center justify-center
+                  flex items-center justify-center overflow-hidden
                   hover:ring-2 ring-cyan-400 transition
                   font-semibold text-white
                 ">
-                  AC
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover rounded-full" />
+                  ) : (
+                    <span>
+                      {(user?.name || 'U')
+                        .split(' ')
+                        .map(p=>p[0])
+                        .join('')
+                        .slice(0,2)
+                      }
+                    </span>
+                  )}
                 </button>
                 
                 {showProfileMenu && (
@@ -175,9 +179,12 @@ export const Navbar = () => {
                     animate-slide-down
                   ">
                     <div className="p-4 border-b border-white/10">
-                      <div className="font-semibold">Alex Chen</div>
+                      <div className="font-semibold">{user?.name ?? 'User'}</div>
                       <div className="text-sm text-gray-400">
-                        Level 6 • 2,847 XP
+                        {user?.email || ''}
+                      </div>
+                      <div className="text-sm text-gray-400 mt-1">
+                        Level {user?.level ?? 1} • {(user?.currentXP ?? 0).toLocaleString()} XP
                       </div>
                     </div>
                     
@@ -187,12 +194,19 @@ export const Navbar = () => {
                     <Link to="/settings" className="nav-dropdown-item">
                       ⚙️ Settings
                     </Link>
-                    <button className="nav-dropdown-item w-full text-left text-red-400 hover:bg-red-500/10">
+                    <button 
+                      onClick={() => {
+                        logout();
+                        setShowProfileMenu(false);
+                      }}
+                      className="nav-dropdown-item w-full text-left text-red-400 hover:bg-red-500/10"
+                    >
                       🚪 Logout
                     </button>
                   </div>
                 )}
-              </div>
+                </div>
+              )}
             </div>
             
             {/* Mobile Menu Button */}
@@ -236,12 +250,24 @@ export const Navbar = () => {
 
             {/* Profile Section */}
             <div className="p-6 border-b border-white/10 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center font-semibold">
-                AC
-              </div>
+              {user?.avatarUrl ? (
+                <img 
+                  src={user.avatarUrl} 
+                  alt={user.name}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center font-semibold">
+                  {user ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2) : 'U'}
+                </div>
+              )}
               <div>
-                <div className="font-semibold">Alex Chen</div>
-                <div className="text-sm text-gray-400">Level 6 • 2,847 XP</div>
+                <div className="font-semibold">
+                  {user ? user.name : 'User'}
+                </div>
+                <div className="text-sm text-gray-400">
+                  {user ? `Level ${user.level || 1} • ${(user.currentXP || 0).toLocaleString()} XP` : 'Not logged in'}
+                </div>
               </div>
             </div>
 
@@ -254,22 +280,22 @@ export const Navbar = () => {
               >
                 🏠 Home
               </Link>
-
-              <div className="py-2">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-2">
-                  Dashboard
-                </div>
-                {dashboardLinks.map((link) => (
-                  <Link
-                    key={link.path}
-                    to={link.path}
-                    className="mobile-nav-item pl-8"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {link.icon} {link.label}
-                  </Link>
-                ))}
-              </div>
+              
+              <Link 
+                to="/daily-rewards" 
+                className="mobile-nav-item"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                🎁 Daily Rewards
+              </Link>
+              
+              <Link 
+                to="/dashboard" 
+                className="mobile-nav-item"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                📊 Dashboard
+              </Link>
 
               <div className="pt-4 border-t border-white/10 space-y-2">
                 <Link 
@@ -286,7 +312,13 @@ export const Navbar = () => {
                 >
                   ⚙️ Settings
                 </Link>
-                <button className="mobile-nav-item w-full text-left text-red-400">
+                <button 
+                  onClick={() => {
+                    logout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="mobile-nav-item w-full text-left text-red-400"
+                >
                   🚪 Logout
                 </button>
               </div>

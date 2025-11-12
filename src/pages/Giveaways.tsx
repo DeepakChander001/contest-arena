@@ -152,10 +152,10 @@ const Giveaways = () => {
   return (
     <div className="min-h-screen p-8 space-y-8 animate-fade-in">
       {/* Hero Section */}
-      <div className="glass-card p-8 text-center">
+      <div className="glass-card-premium p-8 text-center hover-glow card-shimmer">
         <div className="flex items-center justify-center gap-3 mb-4">
           <Gift className="w-8 h-8 text-primary" />
-          <h1 className="text-4xl font-bold">What You Can Win</h1>
+          <h1 className="text-4xl font-bold gradient-text">What You Can Win</h1>
         </div>
         <p className="text-xl text-muted-foreground mb-2">Real AI tools and premium perks for top performers</p>
         <div className="text-3xl font-bold text-primary mt-4">Over $12,000 in prizes monthly</div>
@@ -166,7 +166,7 @@ const Giveaways = () => {
         <h2 className="text-2xl font-bold">Featured Prizes</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {carouselPrizes.map((prize) => (
-            <div key={prize.id} className="glass-card overflow-hidden group hover:scale-105 transition-all duration-300">
+            <div key={prize.id} className="glass-card-premium overflow-hidden group hover:scale-105 transition-all duration-300 hover-glow">
               <div className="relative h-48 overflow-hidden">
                 <img 
                   src={prize.image} 
@@ -201,7 +201,7 @@ const Giveaways = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="glass-card p-4">
+      <div className="glass-card-premium p-4 hover-glow">
         <div className="flex flex-wrap gap-2">
           {categories.map((cat) => (
             <Button
@@ -222,7 +222,7 @@ const Giveaways = () => {
         <h2 className="text-2xl font-bold">All Available Prizes</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPrizes.map((prize) => (
-            <div key={prize.id} className="glass-card overflow-hidden hover:scale-105 transition-all duration-300">
+            <div key={prize.id} className="glass-card-premium overflow-hidden hover:scale-105 transition-all duration-300 hover-glow">
               <div className="relative h-40 overflow-hidden">
                 <img 
                   src={prize.image} 
@@ -254,7 +254,7 @@ const Giveaways = () => {
       </div>
 
       {/* Value Calculator */}
-      <div className="glass-card p-6 bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
+      <div className="glass-card-premium p-6 bg-gradient-to-br from-primary/10 to-transparent border-primary/20 hover-glow">
         <h3 className="text-xl font-bold mb-4">💎 If you win LEAP Challenge this month:</h3>
         <div className="space-y-3">
           <div className="flex items-center gap-3">
@@ -281,7 +281,7 @@ const Giveaways = () => {
         <h2 className="text-2xl font-bold">Recent Prize Winners</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {pastWinners.map((winner, idx) => (
-            <div key={idx} className="glass-card p-4 text-center">
+            <div key={idx} className="glass-card-premium p-4 text-center hover-glow">
               <img 
                 src={winner.avatar} 
                 alt={winner.username}

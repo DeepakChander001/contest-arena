@@ -34,7 +34,7 @@ export const ContestCard = ({
   };
 
   return (
-    <div className="glass-card-elevated p-6 space-y-4 hover-lift cursor-pointer group">
+    <div className="glass-card p-6 rounded-xl shadow-lg space-y-4 hover:scale-105 transition-all duration-300 cursor-pointer group">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-3">
@@ -47,7 +47,7 @@ export const ContestCard = ({
               </span>
             )}
           </div>
-          <h4 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">
+          <h4 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors text-white">
             {title}
           </h4>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">

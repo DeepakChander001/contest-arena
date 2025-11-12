@@ -448,8 +448,8 @@ const LEAP = () => {
       </div>
 
       {/* FAQ */}
-      <div className="glass-card p-6">
-        <h2 className="text-2xl font-bold mb-4">Frequently Asked Questions</h2>
+      <div className="glass-card-premium p-6 hover-glow">
+        <h2 className="text-2xl font-bold mb-4 gradient-text">Frequently Asked Questions</h2>
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="item-1">
             <AccordionTrigger>What if I can't attend all 3 days?</AccordionTrigger>
@@ -486,7 +486,7 @@ const LEAP = () => {
       </div>
 
       {/* CTA */}
-      <div className="glass-card p-8 text-center bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
+      <div className="glass-card-premium p-8 text-center bg-gradient-to-br from-primary/10 to-transparent border-primary/20 hover-glow card-shimmer">
         {qualificationStatus.qualified ? (
           <>
             <h3 className="text-2xl font-bold mb-4">You're Ready for LEAP!</h3>

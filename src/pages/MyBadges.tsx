@@ -1,12 +1,26 @@
 import { Trophy, Flame, Calendar, Zap, TrendingUp, Users, Megaphone, Lightbulb, GraduationCap, Crown, Book, Star, Lock, Award, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MyBadges = () => {
+  const { user } = useAuth();
+  
+  // Map Circle tags to our badge system
+  const hasExplorerTag = user?.badges?.some(badge => 
+    badge.name.toLowerCase().includes('explorer')
+  ) || false;
+  
+  const hasMasterTag = user?.badges?.some(badge => 
+    badge.name.toLowerCase().includes('master')
+  ) || false;
+
+  const earnedBadges = (user?.badges?.filter(b => b.earned).length || 0);
+  const totalBadges = 22;
   const badgeStats = {
-    earned: 8,
-    total: 22,
-    percentage: 36,
+    earned: earnedBadges,
+    total: totalBadges,
+    percentage: Math.round((earnedBadges / totalBadges) * 100),
   };
 
   const categories = [
@@ -46,11 +60,11 @@ const MyBadges = () => {
     },
     {
       name: "Course Badges",
-      count: "2/8",
-      progress: 25,
+      count: `${hasExplorerTag ? 1 : 0}/4`,
+      progress: hasExplorerTag ? 25 : 0,
       badges: [
-        { id: 14, name: "AI Prompt Explorer", icon: Book, earned: true, date: "Sept 15, 2024", description: "25% course progress" },
-        { id: 15, name: "AI Prompt Master", icon: Star, earned: true, date: "Sept 30, 2024", description: "100% completed" },
+        { id: 14, name: "Course Explorer", icon: Book, earned: hasExplorerTag, date: hasExplorerTag ? "Recently earned" : undefined, description: hasExplorerTag ? "Explorer tag earned in Circle" : undefined },
+        { id: 15, name: "Course Master", icon: Star, earned: hasMasterTag, date: hasMasterTag ? "Recently earned" : undefined, description: hasMasterTag ? "Master tag earned in Circle" : undefined },
         { id: 16, name: "AI Automation Explorer", icon: Book, earned: false, howToEarn: "Enroll in AI Automation course" },
         { id: 17, name: "AI Automation Master", icon: Star, earned: false, howToEarn: "Complete 100% with passing grade" },
       ],
@@ -69,8 +83,8 @@ const MyBadges = () => {
   return (
     <div className="min-h-screen p-8 space-y-8 animate-fade-in">
       {/* Hero Stats */}
-      <div className="glass-card p-8">
-        <h1 className="text-3xl font-bold mb-6">My Badge Collection</h1>
+      <div className="glass-card-premium p-8 hover-glow">
+        <h1 className="text-3xl font-bold mb-6 gradient-text">My Badge Collection</h1>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-2xl font-bold">{badgeStats.earned} of {badgeStats.total} Badges Earned</span>
@@ -95,7 +109,7 @@ const MyBadges = () => {
               return (
                 <div
                   key={badge.id}
-                  className={`glass-card p-6 text-center transition-all ${
+                  className={`glass-card-premium p-6 text-center transition-all hover-glow ${
                     badge.earned 
                       ? "hover:scale-105 border-primary/30" 
                       : "opacity-60 grayscale"
@@ -136,7 +150,7 @@ const MyBadges = () => {
       ))}
 
       {/* Quick Stats */}
-      <div className="glass-card p-6 bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
+      <div className="glass-card-premium p-6 bg-gradient-to-br from-primary/10 to-transparent border-primary/20 hover-glow">
         <h3 className="text-lg font-bold mb-4">Badge Insights</h3>
         <div className="space-y-2 text-sm">
           <p>🏆 Rarest badge you have: <span className="font-bold text-primary">Speed Champion</span> (15% have this)</p>

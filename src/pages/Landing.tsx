@@ -35,7 +35,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState, useRef } from "react";
 import { Navbar } from "@/components/Navbar";
 import initScrollReveal from "@/utils/scrollReveal";
-import { SplineBackground } from "@/components/SplineBackground";
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -97,10 +96,7 @@ const Landing = () => {
         ref={heroRef}
         className="relative min-h-screen flex items-center justify-center overflow-hidden px-4 py-20 pt-32"
       >
-        {/* Spline 3D Background Animation */}
-        <SplineBackground className="opacity-40" />
-        
-        {/* Fallback Gradient Background (shown if Spline fails to load) */}
+        {/* Animated Gradient Background with Parallax */}
         <div 
           className="absolute inset-0 opacity-30"
           style={{

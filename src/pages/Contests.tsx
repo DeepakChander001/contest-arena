@@ -89,14 +89,14 @@ const Contests = () => {
 
   return (
     <div className="min-h-screen p-8 space-y-6 animate-fade-in">
-      {/* Header */}
+      {/* Header - PREMIUM ENHANCEMENT */}
       <div>
-        <h1 className="text-4xl font-bold mb-2">Contest Hub</h1>
+        <h1 className="text-4xl font-bold mb-2 gradient-text">Contest Hub</h1>
         <p className="text-muted-foreground">Compete, win, and level up your skills</p>
       </div>
 
-      {/* Filter Bar */}
-      <div className="glass-card p-6">
+      {/* Filter Bar - PREMIUM ENHANCEMENT */}
+      <div className="glass-card-premium p-6 hover-glow">
         <div className="flex flex-col lg:flex-row gap-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
             <TabsList className="grid w-full grid-cols-3 bg-muted">
@@ -123,17 +123,23 @@ const Contests = () => {
         </div>
       </div>
 
-      {/* Contest Grid */}
+      {/* Contest Grid - PREMIUM ENHANCEMENT */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredContests.map((contest) => (
-          <ContestCard key={contest.id} {...contest} />
+        {filteredContests.map((contest, index) => (
+          <div 
+            key={contest.id}
+            className="scroll-reveal"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <ContestCard {...contest} />
+          </div>
         ))}
       </div>
 
       {filteredContests.length === 0 && (
-        <div className="glass-card p-12 text-center">
+        <div className="glass-card-premium p-12 text-center hover-glow">
           <p className="text-muted-foreground mb-4">No contests found</p>
-          <Button onClick={() => setSearchQuery("")}>Clear filters</Button>
+          <Button onClick={() => setSearchQuery("")} className="btn-premium">Clear filters</Button>
         </div>
       )}
     </div>

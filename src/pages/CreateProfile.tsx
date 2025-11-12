@@ -213,7 +213,7 @@ const CreateProfile = () => {
             try {
               // Try to get user data from database
               const dbResponse = await fetch(
-                `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/user?email=${encodeURIComponent(formData.email)}`,
+                `${import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com'}/api/user?email=${encodeURIComponent(formData.email)}`,
                 { credentials: 'include' }
               );
               
