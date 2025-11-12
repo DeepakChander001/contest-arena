@@ -61,13 +61,25 @@ export const configureGoogleAuth = () => {
 // Get Google OAuth URL
 export const getGoogleAuthUrl = (req: Request, res: Response) => {
   try {
+    console.log('🔐 GET /api/auth/google/url - Request received');
+    console.log('🔐 Request origin:', req.get('origin'));
+    console.log('🔐 Request headers:', req.headers);
+    
     const clientID = process.env.GOOGLE_CLIENT_ID;
     const redirectURI = process.env.GOOGLE_REDIRECT_URI || 'https://leaderboard.1to10x.com/api/auth/google/callback';
     
-    if (!clientID || clientID === 'your_google_client_id_here') {
+    console.log('🔐 Client ID present:', !!clientID);
+    console.log('🔐 Redirect URI:', redirectURI);
+    
+    if (!clientID || clientID === 'your_google_client_id_here' || clientID.trim() === '') {
+      console.error('❌ Google OAuth not configured - Client ID missing or invalid');
       return res.status(500).json({
         error: 'Google OAuth not configured',
         message: 'Please add your Google OAuth credentials to the .env file. See ENV_FORMAT.md for instructions.',
+        details: {
+          hasClientID: !!clientID,
+          clientIDLength: clientID?.length || 0,
+        },
       });
     }
 
@@ -83,9 +95,15 @@ export const getGoogleAuthUrl = (req: Request, res: Response) => {
       `state=${state}&` +
       `prompt=select_account`; // Force account selection
 
+    console.log('✅ OAuth URL generated successfully');
+    console.log('✅ Redirect URI:', redirectURI);
+    
+    // Ensure we're sending JSON
+    res.setHeader('Content-Type', 'application/json');
     res.json({ url: authUrl });
   } catch (error: any) {
     console.error('❌ Error generating Google OAuth URL:', error);
+    res.setHeader('Content-Type', 'application/json');
     res.status(500).json({
       error: 'Failed to generate OAuth URL',
       message: error.message,

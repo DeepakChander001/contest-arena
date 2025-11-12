@@ -336,23 +336,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loginWithGoogle = async (): Promise<{ success: boolean; message: string }> => {
     try {
       setIsLoading(true);
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
+      const endpoint = `${apiUrl}/api/auth/google/url`;
+      
+      console.log('🔐 Attempting Google OAuth login...');
+      console.log('📡 API URL:', apiUrl);
+      console.log('📡 Endpoint:', endpoint);
+      
       // Use the correct endpoint: /api/auth/google/url
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com'}/api/auth/google/url`, {
+      const response = await fetch(endpoint, {
+        method: 'GET',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
+
+      // Check if response is actually JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Response is not JSON. Content type:', contentType);
+        console.error('❌ Response body:', text.substring(0, 200));
+        throw new Error(`Server returned ${contentType} instead of JSON. Check if API endpoint is accessible.`);
+      }
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.message || 'Failed to get Google OAuth URL');
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+        console.error('❌ API Error:', errorData);
+        throw new Error(errorData.error || errorData.message || `Failed to get Google OAuth URL (${response.status})`);
       }
 
       const data = await response.json();
+      console.log('✅ OAuth URL received:', data.url ? 'URL present' : 'URL missing');
+      
       const url = data.url;
       
       if (!url) {
+        console.error('❌ No URL in response:', data);
         throw new Error('No OAuth URL returned from server');
       }
       
+      console.log('🔄 Redirecting to Google OAuth...');
       // Redirect to Google OAuth
       window.location.href = url;
       
@@ -362,13 +390,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
 
     } catch (error: any) {
-      console.error('Google OAuth error:', error);
+      console.error('❌ Google OAuth error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+      setIsLoading(false);
       return {
         success: false,
-        message: error.message || 'Google OAuth failed. Please try again.',
+        message: error.message || 'Google OAuth failed. Please check console for details.',
       };
-    } finally {
-      setIsLoading(false);
     }
   };
 

@@ -46,6 +46,8 @@ app.use(cors({
     'http://localhost:5173', // Development
   ],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 
@@ -458,12 +460,15 @@ app.get('/api/member-spaces', (req, res) => {
       console.log('📦 Serving frontend static files from:', frontendDistPath);
       
       // Serve static files ONLY for non-API routes
+      // IMPORTANT: This middleware must check the path BEFORE serving static files
       app.use((req, res, next) => {
-        // Skip static file serving for API routes
+        // CRITICAL: Skip static file serving for ALL API routes
         if (req.path.startsWith('/api/')) {
-          return next();
+          console.log('🚫 Skipping static file serving for API route:', req.path);
+          return next(); // Pass to next middleware (API routes)
         }
         // Serve static files for all other routes
+        console.log('📦 Serving static file for:', req.path);
         express.static(frontendDistPath)(req, res, next);
       });
       
