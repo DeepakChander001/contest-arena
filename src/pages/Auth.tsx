@@ -1,5 +1,5 @@
 import { useGoogleLogin } from "@react-oauth/google";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
