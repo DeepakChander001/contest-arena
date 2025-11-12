@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -12,16 +12,16 @@ declare global {
 const Auth = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [googleReady, setGoogleReady] = useState(false);
+  const [showGoogleButton, setShowGoogleButton] = useState(false);
   
   const { isAuthenticated, user, handleGoogleLogin: handleAuthLogin } = useAuth();
   const navigate = useNavigate();
   
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // Handle credential response
-  const handleCredentialResponse = useCallback(async (response: any) => {
-    console.log("✅ Credential received");
+  // Handle Google sign-in response
+  const handleCredentialResponse = async (response: any) => {
+    console.log('✅ Sign-in response received');
     setLoading(true);
     setMessage(null);
 
@@ -32,7 +32,7 @@ const Auth = () => {
         throw new Error('No credential received');
       }
 
-      // Decode JWT token
+      // Decode JWT
       const base64Url = credential.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const jsonPayload = decodeURIComponent(
@@ -55,17 +55,15 @@ const Auth = () => {
       // Call AuthContext handler to process the login (fetches Circle data)
       await handleAuthLogin(googleUserData);
       
-      // Important: Use window.location instead of navigate to avoid React conflicts
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 100);
+      // Navigate using window.location to avoid React issues
+      window.location.href = '/dashboard';
       
     } catch (err: any) {
-      console.error('❌ Error:', err);
-      setMessage({ type: 'error', text: err.message || 'Failed to sign in. Please try again.' });
+      console.error('❌ Sign-in error:', err);
+      setMessage({ type: 'error', text: err.message || 'Failed to complete sign-in' });
       setLoading(false);
     }
-  }, [handleAuthLogin]);
+  };
 
   // Check if already authenticated
   useEffect(() => {
@@ -75,111 +73,104 @@ const Auth = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
-  // Initialize Google Sign-In
+  // Initialize Google Sign-In directly in useEffect with complete DOM isolation
   useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) {
+      setMessage({ type: 'error', text: 'Google Sign-In is not configured' });
+      return;
+    }
+
     let mounted = true;
-    let scriptElement: HTMLScriptElement | null = null;
 
-    const initializeGoogle = () => {
-      if (!mounted) return;
-
-      console.log("🔄 Initializing Google Sign-In...");
-
-      // Check if already initialized
-      if (window.google?.accounts?.id) {
-        try {
-          // Initialize
-          window.google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: handleCredentialResponse,
-            auto_select: false,
-            cancel_on_tap_outside: true,
-          });
-
-          // Create a container div that React won't touch
-          const buttonContainer = document.createElement('div');
-          buttonContainer.id = 'g_id_signin_container';
-          
-          // Find the placeholder and append container
-          const placeholder = document.getElementById('google-signin-placeholder');
-          if (placeholder && mounted) {
-            // Clear placeholder first
-            placeholder.innerHTML = '';
-            placeholder.appendChild(buttonContainer);
-
-            // Render button in the isolated container
-            window.google.accounts.id.renderButton(
-              buttonContainer,
-              {
-                type: 'standard',
-                theme: 'outline',
-                size: 'large',
-                text: 'signin_with',
-                shape: 'rectangular',
-                width: 280,
-              }
-            );
-
-            console.log("✅ Google button rendered");
-            setGoogleReady(true);
-          }
-        } catch (err) {
-          console.error("❌ Failed to initialize:", err);
-          if (mounted) {
-            setMessage({ type: 'error', text: 'Failed to initialize Google Sign-In' });
-          }
-        }
-      }
-    };
-
-    const loadScript = () => {
+    const loadGoogleScript = () => {
       // Check if script already exists
-      if (document.querySelector('script[src="https://accounts.google.com/gsi/client"]')) {
-        initializeGoogle();
+      const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+      
+      if (existingScript) {
+        // Script already loaded, initialize immediately
+        if (window.google?.accounts?.id) {
+          initializeGoogleButton();
+        }
         return;
       }
 
-      scriptElement = document.createElement('script');
-      scriptElement.src = 'https://accounts.google.com/gsi/client';
-      scriptElement.async = true;
-      scriptElement.defer = true;
-
-      scriptElement.onload = () => {
-        if (mounted) {
-          initializeGoogle();
+      // Load script
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      
+      script.onload = () => {
+        if (mounted && window.google?.accounts?.id) {
+          initializeGoogleButton();
         }
       };
 
-      scriptElement.onerror = () => {
+      script.onerror = () => {
         if (mounted) {
           setMessage({ type: 'error', text: 'Failed to load Google Sign-In' });
         }
       };
 
-      document.head.appendChild(scriptElement);
+      document.head.appendChild(script);
     };
 
-    if (GOOGLE_CLIENT_ID) {
-      loadScript();
-    } else {
-      setMessage({ type: 'error', text: 'Google Client ID not configured' });
-    }
+    const initializeGoogleButton = () => {
+      const buttonDiv = document.getElementById('google-button-div');
+      if (!buttonDiv || !mounted) return;
 
-    // Cleanup function
+      try {
+        // Clear any existing content - CRITICAL: React must not touch this
+        buttonDiv.innerHTML = '';
+
+        // Initialize Google Sign-In
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response: any) => {
+            handleCredentialResponse(response);
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+
+        // Render button directly into the div - Google controls this DOM
+        window.google.accounts.id.renderButton(
+          buttonDiv,
+          {
+            type: 'standard',
+            theme: 'outline', 
+            size: 'large',
+            text: 'signin_with',
+            width: '100%',
+            locale: 'en'
+          }
+        );
+
+        setShowGoogleButton(true);
+        console.log('✅ Google button initialized');
+      } catch (err) {
+        console.error('❌ Error initializing Google button:', err);
+        if (mounted) {
+          setMessage({ type: 'error', text: 'Failed to initialize sign-in' });
+        }
+      }
+    };
+
+    // Start loading process with small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      loadGoogleScript();
+    }, 100);
+
     return () => {
       mounted = false;
-      // Don't remove the script as it might be used elsewhere
+      clearTimeout(timer);
     };
-  }, [GOOGLE_CLIENT_ID, handleCredentialResponse]);
+  }, [GOOGLE_CLIENT_ID]);
 
-  // Alternative OAuth flow
-  const handleAlternativeSignIn = () => {
-    console.log("🔄 Alternative sign-in method");
-    setLoading(true);
-
+  // Fallback OAuth method
+  const handleOAuthRedirect = () => {
     if (!GOOGLE_CLIENT_ID) {
-      setMessage({ type: 'error', text: 'Google Sign-In is not configured.' });
-      setLoading(false);
+      setMessage({ type: 'error', text: 'Google Client ID not configured' });
       return;
     }
 
@@ -190,8 +181,7 @@ const Auth = () => {
       response_type: 'code',
       scope: 'openid email profile',
       access_type: 'offline',
-      prompt: 'select_account',
-      state: Math.random().toString(36).substring(7),
+      prompt: 'select_account'
     });
 
     window.location.href = `${authUrl}?${params.toString()}`;
@@ -254,34 +244,33 @@ const Auth = () => {
               </div>
             )}
 
-            {/* Google Sign-In Button Placeholder */}
+            {/* Google Sign-In Container - React does NOT manage children of this div */}
             <div 
-              id="google-signin-placeholder" 
-              className="flex justify-center min-h-[50px] items-center"
-              // Important: Don't let React manage this div's children
+              id="google-button-div"
+              className="w-full flex justify-center min-h-[50px] items-center"
               suppressHydrationWarning={true}
             >
-              {!googleReady && !message && (
+              {!showGoogleButton && !message && (
                 <div className="text-muted-foreground text-sm animate-pulse">
-                  Loading Google Sign-In...
+                  Loading sign-in...
                 </div>
               )}
             </div>
 
-            {/* Show alternative only if Google button fails */}
-            {(message?.type === 'error' || !googleReady) && (
+            {/* Fallback Button - Only show if Google button fails */}
+            {(!showGoogleButton || message?.type === 'error') && (
               <>
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-white/10"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-transparent text-muted-foreground">or</span>
+                    <span className="px-2 bg-transparent text-muted-foreground">or try</span>
                   </div>
                 </div>
 
                 <button
-                  onClick={handleAlternativeSignIn}
+                  onClick={handleOAuthRedirect}
                   disabled={loading}
                   className={`w-full bg-white hover:bg-gray-50 text-gray-800 font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 border border-gray-300 shadow-lg hover:shadow-xl ${
                     loading ? 'opacity-50 cursor-not-allowed' : ''
@@ -304,7 +293,7 @@ const Auth = () => {
                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                       </svg>
-                      <span>Continue with Google</span>
+                      <span>Alternative Sign-In Method</span>
                     </>
                   )}
                 </button>

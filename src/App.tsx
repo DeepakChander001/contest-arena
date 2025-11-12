@@ -23,8 +23,39 @@ import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import CreateProfile from "./pages/CreateProfile";
 import NotFound from "./pages/NotFound";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
+
+// Add global styles to prevent React from interfering with Google Sign-In button
+useEffect(() => {
+  const style = document.createElement('style');
+  style.innerHTML = `
+    /* Prevent React from interfering with Google Sign-In button */
+    #google-button-div > * {
+      pointer-events: auto !important;
+    }
+    
+    /* Ensure Google button is clickable */
+    .nsm7Bb-HzV7m-LgbsSe {
+      pointer-events: auto !important;
+      cursor: pointer !important;
+    }
+    
+    /* Prevent React from removing Google button */
+    #google-button-div {
+      position: relative;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  return () => {
+    // Cleanup on unmount
+    if (document.head.contains(style)) {
+      document.head.removeChild(style);
+    }
+  };
+}, []);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
