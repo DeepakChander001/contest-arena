@@ -26,12 +26,20 @@ interface User {
   spaces: MemberSpaces[];
 }
 
+interface GoogleUserData {
+  email: string;
+  name: string;
+  picture: string;
+  sub: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string) => Promise<{ success: boolean; message: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; message: string }>;
+  handleGoogleLogin: (googleUserData: GoogleUserData) => Promise<void>;
   logout: () => void;
   refreshUserData: (email?: string) => Promise<void>;
   updateUserXP: (xpEarned: number) => void;
@@ -333,75 +341,102 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const loginWithGoogle = async (): Promise<{ success: boolean; message: string }> => {
+  // Frontend-only Google OAuth handler (using @react-oauth/google)
+  const handleGoogleLogin = async (googleUserData: GoogleUserData): Promise<void> => {
     try {
       setIsLoading(true);
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
-      const endpoint = `${apiUrl}/api/auth/google/url`;
+      console.log('🔐 Processing Google OAuth login for:', googleUserData.email);
       
-      console.log('🔐 Attempting Google OAuth login...');
-      console.log('📡 API URL:', apiUrl);
-      console.log('📡 Endpoint:', endpoint);
-      
-      // Use the correct endpoint: /api/auth/google/url
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Always fetch Circle data - never use Google data as fallback
+      try {
+        const memberData = await apiService.getMemberData(googleUserData.email);
+        
+        // If member data is found, proceed with Circle data
+        if (memberData && memberData.id) {
+          console.log('✅ Circle member found, fetching full profile data...');
+          
+          // Fetch spaces and calculate stats
+          let spaces: MemberSpaces[] = [];
+          try {
+            const spacesData = await apiService.getMemberSpaces(memberData.id.toString());
+            spaces = Array.isArray(spacesData) ? spacesData : [];
+          } catch (spaceError) {
+            console.warn('⚠️ Could not fetch spaces:', spaceError);
+            spaces = [];
+          }
+          
+          const stats = apiService.calculateUserStats(memberData, spaces);
 
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
+          const fullUser: User = {
+            id: memberData.id.toString(),
+            email: memberData.email,
+            name: memberData.name || googleUserData.name || 'User',
+            avatarUrl: memberData.avatar_url || googleUserData.picture || null,
+            googleId: googleUserData.sub,
+            level: memberData.gamification_stats?.current_level || 1,
+            currentXP: memberData.gamification_stats?.total_points || 0,
+            currentLevelXP: memberData.gamification_stats?.total_points || 0,
+            nextLevelXP: memberData.gamification_stats?.points_to_next_level || 1000,
+            progressPct: memberData.gamification_stats?.level_progress || 0,
+            badges: memberData.member_tags?.map((tag: any) => ({
+              id: tag.id,
+              name: tag.name,
+            })) || [],
+            postsCount: memberData.posts_count || 0,
+            commentsCount: memberData.comments_count || 0,
+            activityScore: memberData.activity_score?.activity_score || "0",
+            bio: memberData.flattened_profile_fields?.bio || null,
+            profileFields: memberData.flattened_profile_fields || {},
+            createdAt: memberData.created_at,
+            lastSeenAt: memberData.last_seen_at,
+            completedLessons: stats.completedLessons,
+            totalLessons: stats.totalLessons,
+            streak: stats.streak,
+            spaces,
+          };
 
-      // Check if response is actually JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('❌ Response is not JSON. Content type:', contentType);
-        console.error('❌ Response body:', text.substring(0, 200));
-        throw new Error(`Server returned ${contentType} instead of JSON. Check if API endpoint is accessible.`);
+          console.log('✅ User data prepared:', { id: fullUser.id, email: fullUser.email, name: fullUser.name });
+          
+          setUser(fullUser);
+          localStorage.setItem('10x-contest-user', JSON.stringify(fullUser));
+          setIsLoading(false);
+          
+          return;
+        } else {
+          // User not found in Circle - redirect to profile creation
+          console.log('⚠️ User not found in Circle, redirecting to profile creation');
+          setIsLoading(false);
+          window.location.href = `/create-profile?email=${encodeURIComponent(googleUserData.email)}&name=${encodeURIComponent(googleUserData.name || '')}`;
+          return;
+        }
+      } catch (error: any) {
+        console.error('❌ Error fetching Circle data:', error);
+        
+        // If error is "not found", redirect to profile creation
+        if (error.message?.includes('not found') || error.message?.includes('404') || error.notFound) {
+          console.log('⚠️ User not found in Circle, redirecting to profile creation');
+          setIsLoading(false);
+          window.location.href = `/create-profile?email=${encodeURIComponent(googleUserData.email)}&name=${encodeURIComponent(googleUserData.name || '')}`;
+          return;
+        }
+        
+        // For other errors, throw to be caught by caller
+        setIsLoading(false);
+        throw error;
       }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
-        console.error('❌ API Error:', errorData);
-        throw new Error(errorData.error || errorData.message || `Failed to get Google OAuth URL (${response.status})`);
-      }
-
-      const data = await response.json();
-      console.log('✅ OAuth URL received:', data.url ? 'URL present' : 'URL missing');
-      
-      const url = data.url;
-      
-      if (!url) {
-        console.error('❌ No URL in response:', data);
-        throw new Error('No OAuth URL returned from server');
-      }
-      
-      console.log('🔄 Redirecting to Google OAuth...');
-      // Redirect to Google OAuth
-      window.location.href = url;
-      
-      return {
-        success: true,
-        message: 'Redirecting to Google...',
-      };
-
     } catch (error: any) {
-      console.error('❌ Google OAuth error:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
+      console.error('❌ Error in handleGoogleLogin:', error);
       setIsLoading(false);
-      return {
-        success: false,
-        message: error.message || 'Google OAuth failed. Please check console for details.',
-      };
+      throw error;
     }
+  };
+
+  // Legacy backend-based Google OAuth (kept for backward compatibility)
+  const loginWithGoogle = async (): Promise<{ success: boolean; message: string }> => {
+    return {
+      success: false,
+      message: 'Please use the Google Login button on the auth page.',
+    };
   };
 
   const refreshUserData = async (emailParam?: string) => {
@@ -535,6 +570,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAuthenticated,
         login,
         loginWithGoogle,
+        handleGoogleLogin,
         logout,
         refreshUserData,
         updateUserXP,
