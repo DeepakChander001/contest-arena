@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -10,9 +10,10 @@ declare global {
 }
 
 const Auth = () => {
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showGoogleButton, setShowGoogleButton] = useState(false);
+  const [buttonReady, setButtonReady] = useState(false);
   
   const { isAuthenticated, user, handleGoogleLogin: handleAuthLogin } = useAuth();
   const navigate = useNavigate();
@@ -73,97 +74,107 @@ const Auth = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
-  // Initialize Google Sign-In directly in useEffect with complete DOM isolation
+  // Load and initialize Google Sign-In with complete DOM isolation using useRef
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
-      setMessage({ type: 'error', text: 'Google Sign-In is not configured' });
+      setMessage({ type: 'error', text: 'Google Client ID not configured' });
       return;
     }
 
-    let mounted = true;
+    let isMounted = true;
 
     const loadGoogleScript = () => {
       // Check if script already exists
       const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
       
       if (existingScript) {
-        // Script already loaded, initialize immediately
-        if (window.google?.accounts?.id) {
-          initializeGoogleButton();
-        }
+        // Script already loaded, wait for it to be ready
+        const checkGoogle = setInterval(() => {
+          if (window.google?.accounts?.id && isMounted) {
+            clearInterval(checkGoogle);
+            initializeGoogleSignIn();
+          }
+        }, 100);
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          clearInterval(checkGoogle);
+          if (!window.google?.accounts?.id && isMounted) {
+            setMessage({ type: 'error', text: 'Google Sign-In failed to load' });
+          }
+        }, 5000);
         return;
       }
 
-      // Load script
+      // Load new script
       const script = document.createElement('script');
       script.src = 'https://accounts.google.com/gsi/client';
       script.async = true;
       script.defer = true;
       
       script.onload = () => {
-        if (mounted && window.google?.accounts?.id) {
-          initializeGoogleButton();
+        if (isMounted) {
+          // Wait for google object to be ready
+          const checkGoogle = setInterval(() => {
+            if (window.google?.accounts?.id && isMounted) {
+              clearInterval(checkGoogle);
+              initializeGoogleSignIn();
+            }
+          }, 100);
         }
       };
 
       script.onerror = () => {
-        if (mounted) {
-          setMessage({ type: 'error', text: 'Failed to load Google Sign-In' });
+        if (isMounted) {
+          setMessage({ type: 'error', text: 'Failed to load Google Sign-In script' });
         }
       };
 
       document.head.appendChild(script);
     };
 
-    const initializeGoogleButton = () => {
-      const buttonDiv = document.getElementById('google-button-div');
-      if (!buttonDiv || !mounted) return;
+    const initializeGoogleSignIn = () => {
+      if (!googleButtonRef.current || !isMounted) return;
 
       try {
-        // Clear any existing content - CRITICAL: React must not touch this
-        buttonDiv.innerHTML = '';
-
         // Initialize Google Sign-In
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback: (response: any) => {
-            handleCredentialResponse(response);
-          },
+          callback: handleCredentialResponse,
           auto_select: false,
           cancel_on_tap_outside: true,
         });
 
-        // Render button directly into the div - Google controls this DOM
+        // Render button with fixed width (pixels, not percentage)
         window.google.accounts.id.renderButton(
-          buttonDiv,
+          googleButtonRef.current,
           {
             type: 'standard',
-            theme: 'outline', 
+            theme: 'outline',
             size: 'large',
             text: 'signin_with',
-            width: '100%',
-            locale: 'en'
+            shape: 'rectangular',
+            width: 280, // Fixed pixel width, not percentage
+            logo_alignment: 'left'
           }
         );
 
-        setShowGoogleButton(true);
-        console.log('✅ Google button initialized');
+        setButtonReady(true);
+        console.log('✅ Google Sign-In initialized');
       } catch (err) {
-        console.error('❌ Error initializing Google button:', err);
-        if (mounted) {
-          setMessage({ type: 'error', text: 'Failed to initialize sign-in' });
+        console.error('❌ Failed to initialize Google Sign-In:', err);
+        if (isMounted) {
+          setMessage({ type: 'error', text: 'Failed to initialize Google Sign-In' });
         }
       }
     };
 
-    // Start loading process with small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      loadGoogleScript();
-    }, 100);
+    // Start loading
+    loadGoogleScript();
 
+    // Cleanup
     return () => {
-      mounted = false;
-      clearTimeout(timer);
+      isMounted = false;
     };
   }, [GOOGLE_CLIENT_ID]);
 
@@ -244,21 +255,22 @@ const Auth = () => {
               </div>
             )}
 
-            {/* Google Sign-In Container - React does NOT manage children of this div */}
+            {/* Google Sign-In Button Container - DO NOT ADD ANY REACT CHILDREN HERE */}
             <div 
-              id="google-button-div"
-              className="w-full flex justify-center min-h-[50px] items-center"
-              suppressHydrationWarning={true}
-            >
-              {!showGoogleButton && !message && (
-                <div className="text-muted-foreground text-sm animate-pulse">
-                  Loading sign-in...
-                </div>
-              )}
-            </div>
+              ref={googleButtonRef}
+              className="flex justify-center min-h-[50px]"
+              style={{ minHeight: '50px' }}
+            />
+
+            {/* Show loading message outside the button container */}
+            {!buttonReady && !message && (
+              <div className="text-center text-muted-foreground text-sm animate-pulse mt-2">
+                Loading Google Sign-In...
+              </div>
+            )}
 
             {/* Fallback Button - Only show if Google button fails */}
-            {(!showGoogleButton || message?.type === 'error') && (
+            {(!buttonReady || message?.type === 'error') && (
               <>
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
