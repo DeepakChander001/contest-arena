@@ -124,10 +124,10 @@ const LEAP = () => {
   return (
     <div className="min-h-screen p-8 space-y-8 animate-fade-in">
       {/* Hero Section */}
-      <div className="glass-card p-8 bg-gradient-to-br from-primary/20 via-accent/10 to-transparent border-primary/30">
+      <div className="glass-card-premium p-8 bg-gradient-to-br from-primary/20 via-accent/10 to-transparent border-primary/30 hover-glow card-shimmer">
         <div className="flex items-center justify-center gap-3 mb-4">
           <Zap className="w-12 h-12 text-primary animate-pulse" />
-          <h1 className="text-5xl font-bold">LEAP CHALLENGE</h1>
+          <h1 className="text-5xl font-bold gradient-text">LEAP CHALLENGE</h1>
         </div>
         <p className="text-2xl text-center mb-2">The Ultimate Monthly Competition</p>
         <p className="text-center text-muted-foreground mb-6">Learning. Execution. Achievement. Performance.</p>
@@ -154,7 +154,7 @@ const LEAP = () => {
       </div>
 
       {/* Qualification Status */}
-      <div className="glass-card p-6">
+      <div className="glass-card-premium p-6 hover-glow">
         <div className="mb-6">
           {qualificationStatus.qualified ? (
             <div className="bg-success/20 border border-success p-4 rounded-lg text-center">
@@ -248,7 +248,7 @@ const LEAP = () => {
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">The 3-Day Challenge</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass-card p-6 hover:scale-105 transition-all">
+          <div className="glass-card-premium p-6 hover:scale-105 transition-all hover-glow">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                 <User className="w-6 h-6 text-primary" />
@@ -273,7 +273,7 @@ const LEAP = () => {
             </div>
           </div>
 
-          <div className="glass-card p-6 hover:scale-105 transition-all">
+          <div className="glass-card-premium p-6 hover:scale-105 transition-all hover-glow">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                 <Users className="w-6 h-6 text-primary" />
@@ -298,7 +298,7 @@ const LEAP = () => {
             </div>
           </div>
 
-          <div className="glass-card p-6 hover:scale-105 transition-all border-2 border-primary">
+          <div className="glass-card-premium p-6 hover:scale-105 transition-all border-2 border-primary hover-glow">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                 <Trophy className="w-6 h-6 text-primary" />
@@ -329,7 +329,7 @@ const LEAP = () => {
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">LEAP Rewards</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass-card p-6 bg-gradient-to-br from-warning/20 to-transparent border-warning/30">
+          <div className="glass-card-premium p-6 bg-gradient-to-br from-warning/20 to-transparent border-warning/30 hover-glow">
             <div className="text-center mb-4">
               <Trophy className="w-16 h-16 text-warning mx-auto mb-3" />
               <h3 className="text-2xl font-bold">🥇 1st Place</h3>
@@ -363,7 +363,7 @@ const LEAP = () => {
             </div>
           </div>
 
-          <div className="glass-card p-6 bg-gradient-to-br from-primary/20 to-transparent border-primary/30">
+          <div className="glass-card-premium p-6 bg-gradient-to-br from-primary/20 to-transparent border-primary/30 hover-glow">
             <div className="text-center mb-4">
               <Award className="w-16 h-16 text-primary mx-auto mb-3" />
               <h3 className="text-2xl font-bold">🥈🥉 2nd-3rd Place</h3>
@@ -393,7 +393,7 @@ const LEAP = () => {
             </div>
           </div>
 
-          <div className="glass-card p-6">
+          <div className="glass-card-premium p-6 hover-glow">
             <div className="text-center mb-4">
               <Award className="w-16 h-16 text-accent mx-auto mb-3" />
               <h3 className="text-2xl font-bold">🎖️ Top 10</h3>
@@ -426,7 +426,7 @@ const LEAP = () => {
         <h2 className="text-2xl font-bold">LEAP Winners Hall of Fame</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pastWinners.map((winner, idx) => (
-            <div key={idx} className="glass-card p-6 hover:scale-105 transition-all">
+            <div key={idx} className="glass-card-premium p-6 hover:scale-105 transition-all hover-glow">
               <img
                 src={winner.avatar}
                 alt={winner.name}

@@ -1,382 +1,622 @@
-import { TrendingUp, Trophy, Target, Award } from "lucide-react";
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useState, useEffect } from "react";
+import { TrendingUp, Trophy, Target, Award, Loader2, Activity, Zap } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from "recharts";
+import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
+interface ProgressData {
+  xpOverTime: {
+    daily: Array<{ date: string; xp: number; transactions: number }>;
+    monthly: Array<{ month: string; xp: number; transactions: number }>;
+  };
+  circleActivity: {
+    scores: Array<{
+      date: string;
+      activity_score: number;
+      presence: number;
+      participation: number;
+      contribution: number;
+      connection: number;
+      posts: number;
+      comments: number;
+    }>;
+    current: any;
+    history: any[];
+  };
+  webAppActivity: {
+    dailyLogins: Array<{ date: string; streak_count: number; xp_earned: number }>;
+    xpTransactions: any[];
+    activityByType: {
+      daily_login: number;
+      contest: number;
+      badge: number;
+      other: number;
+    };
+  };
+  recentActivities: Array<{
+    type: string;
+    description: string;
+    xp: number;
+    time: string;
+    timeAgo: string;
+  }>;
+  currentStats: {
+    totalXP: number;
+    currentLevel: number;
+    streak: number;
+    circleActivityScore: number;
+    postsCount: number;
+    commentsCount: number;
+    totalTransactions: number;
+    totalLogins: number;
+  };
+  user: {
+    email: string;
+    joinedDate: string;
+  };
+}
 
 const MyProgress = () => {
-  // Mock data
-  const userData = {
-    level: 6,
-    currentXP: 2847,
-    nextLevelXP: 4000,
-    totalContests: 24,
-    completedContests: 18,
-    ongoingContests: 6,
-    wins: 7,
-    winRate: 31,
-    monthlyXPGain: 340,
+  const { user, isLoading: authLoading } = useAuth();
+  const [progressData, setProgressData] = useState<ProgressData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Function to refresh session
+  const refreshSession = async () => {
+    if (!user) return false;
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/refresh-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userData: {
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            googleId: user?.googleId || user?.id,
+            googleName: user?.name,
+            googleEmail: user?.email,
+            avatarUrl: user?.avatarUrl
+          }
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Progress session refreshed successfully');
+        return true;
+      } else {
+        console.error('❌ Failed to refresh progress session');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing progress session:', error);
+      return false;
+    }
   };
 
-  const levelHistory = [
-    { level: 1, date: "Aug 1, 2024", xp: 0, days: 0 },
-    { level: 2, date: "Aug 8, 2024", xp: 300, days: 7 },
-    { level: 3, date: "Aug 20, 2024", xp: 600, days: 12 },
-    { level: 4, date: "Sep 5, 2024", xp: 1000, days: 16 },
-    { level: 5, date: "Sep 25, 2024", xp: 2000, days: 20 },
-    { level: 6, date: "Oct 15, 2024", xp: 4000, days: 20 },
-  ];
+  useEffect(() => {
+    const fetchProgressData = async (isInitialLoad = false) => {
+      if (!user) return;
 
-  const xpOverTime = [
-    { month: "May", xp: 400 },
-    { month: "Jun", xp: 850 },
-    { month: "Jul", xp: 1200 },
-    { month: "Aug", xp: 600 },
-    { month: "Sep", xp: 2000 },
-    { month: "Oct", xp: 2847 },
-  ];
+      try {
+        if (isInitialLoad) {
+          setIsLoading(true);
+        }
+        setError(null);
 
-  const performanceByType = [
-    { type: "Speed", avgRank: 3.2, contests: 6 },
-    { type: "Quality", avgRank: 2.1, contests: 8 },
-    { type: "Knowledge", avgRank: 4.5, contests: 5 },
-    { type: "Team", avgRank: 3.8, contests: 3 },
-    { type: "Community", avgRank: 5.2, contests: 2 },
-  ];
+        // Refresh session first to ensure authentication
+        await refreshSession();
 
-  const winLossData = [
-    { name: "Wins", value: 7, color: "hsl(var(--success))" },
-    { name: "Top 3", value: 5, color: "hsl(var(--primary))" },
-    { name: "Top 10", value: 8, color: "hsl(var(--warning))" },
-    { name: "Participated", value: 4, color: "hsl(var(--muted))" },
-  ];
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/progress`, {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-  const pointsBreakdown = [
-    { name: "Contest wins", value: 45, xp: 1280 },
-    { name: "Participation", value: 25, xp: 712 },
-    { name: "Badge bonuses", value: 15, xp: 427 },
-    { name: "Daily activities", value: 10, xp: 285 },
-    { name: "Multipliers", value: 5, xp: 143 },
-  ];
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Session expired. Please log in again.');
+          }
+          throw new Error('Failed to fetch progress data');
+        }
+
+        const data = await response.json();
+        setProgressData(data);
+      } catch (err: any) {
+        console.error('Error fetching progress data:', err);
+        if (isInitialLoad) {
+          setError(err.message || 'Failed to load progress data');
+        }
+      } finally {
+        if (isInitialLoad) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    if (user && !authLoading) {
+      // Initial load
+      fetchProgressData(true);
+      
+      // Auto-refresh every 30 seconds for real-time updates (without loading state)
+      const interval = setInterval(() => {
+        fetchProgressData(false);
+      }, 30000); // 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [user, authLoading]);
+
+  // Show loading state
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading your progress...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error || !progressData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <p className="text-destructive">{error || 'Failed to load progress data'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const stats = progressData.currentStats;
+  const userData = {
+    level: stats.currentLevel,
+    currentXP: stats.totalXP,
+    nextLevelXP: (stats.currentLevel * 500),
+    streak: stats.streak,
+  };
+
+  // Format data for charts
+  const xpDailyData = progressData.xpOverTime.daily.map(item => ({
+    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    xp: item.xp,
+    transactions: item.transactions,
+  }));
+
+  const xpMonthlyData = progressData.xpOverTime.monthly.map(item => ({
+    month: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short' }),
+    xp: item.xp,
+    transactions: item.transactions,
+  }));
+
+  // Circle Activity Scores Chart Data
+  const circleActivityData = progressData.circleActivity.scores.length > 0
+    ? progressData.circleActivity.scores.map(item => ({
+        date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        activity: parseFloat(item.activity_score.toString()) || 0,
+        presence: parseFloat(item.presence.toString()) || 0,
+        participation: parseFloat(item.participation.toString()) || 0,
+        contribution: parseFloat(item.contribution.toString()) || 0,
+        connection: parseFloat(item.connection.toString()) || 0,
+        posts: item.posts || 0,
+        comments: item.comments || 0,
+      }))
+    : [];
+
+  // Activity by Type Pie Chart
+  const activityByTypeData = [
+    { name: "Daily Login", value: progressData.webAppActivity.activityByType.daily_login, color: "hsl(var(--primary))" },
+    { name: "Contests", value: progressData.webAppActivity.activityByType.contest, color: "hsl(var(--success))" },
+    { name: "Badges", value: progressData.webAppActivity.activityByType.badge, color: "hsl(var(--warning))" },
+    { name: "Other", value: progressData.webAppActivity.activityByType.other, color: "hsl(var(--muted))" },
+  ].filter(item => item.value > 0);
+
+  // Daily Login Streak Data
+  const loginStreakData = progressData.webAppActivity.dailyLogins.slice(0, 30).map(item => ({
+    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    streak: item.streak_count || 0,
+    xp: item.xp_earned || 0,
+  }));
+
+  // Combined Activity Chart (Circle + Web App)
+  const combinedActivityData = xpDailyData.map((xpItem, idx) => {
+    const circleItem = circleActivityData[idx] || {};
+    return {
+      date: xpItem.date,
+      webAppXP: xpItem.xp,
+      circleActivity: circleItem.activity || 0,
+      circlePosts: circleItem.posts || 0,
+      circleComments: circleItem.comments || 0,
+    };
+  });
 
   const COLORS = ["hsl(var(--primary))", "hsl(var(--success))", "hsl(var(--warning))", "hsl(var(--accent))", "hsl(var(--muted))"];
 
-  const recentActivities = [
-    { text: "Submitted AI Automation Sprint", time: "2 hours ago", xp: 100 },
-    { text: "Earned Speed Champion badge", time: "1 day ago", xp: 200 },
-    { text: "Leveled up to Level 6", time: "3 days ago", xp: 500 },
-    { text: "Won Friday Quality Challenge", time: "5 days ago", xp: 300 },
-  ];
-
   return (
     <div className="min-h-screen p-8 space-y-8 animate-fade-in">
-      {/* Hero Stats Row */}
+      {/* Header - PREMIUM ENHANCEMENT */}
+      <div>
+        <h1 className="text-4xl font-bold mb-2 gradient-text">My Progress</h1>
+        <p className="text-muted-foreground">Track your journey and achievements</p>
+      </div>
+
+      {/* Hero Stats Row - PREMIUM ENHANCEMENT */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="glass-card p-6">
-          <div className="flex flex-col items-center">
-            <div className="relative w-28 h-28">
-              <svg className="transform -rotate-90 w-28 h-28">
-                <circle cx="56" cy="56" r="50" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
-                <circle
-                  cx="56"
-                  cy="56"
-                  r="50"
-                  fill="none"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="8"
-                  strokeDasharray={`${(userData.currentXP / userData.nextLevelXP) * 314} 314`}
-                  strokeLinecap="round"
-                  className="transition-all duration-500"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">LEVEL</div>
-                  <div className="text-3xl font-bold text-primary">{userData.level}</div>
-                </div>
-              </div>
-            </div>
-            <div className="text-center mt-4">
-              <div className="font-mono text-sm text-muted-foreground">
-                {userData.currentXP} / {userData.nextLevelXP} XP
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {userData.nextLevelXP - userData.currentXP} XP to Level {userData.level + 1}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-card p-6">
-          <div className="flex flex-col gap-2">
-            <span className="text-sm text-muted-foreground">Total XP</span>
-            <div className="font-mono text-3xl font-bold">{userData.currentXP} XP</div>
-            <div className="flex items-center gap-2 text-success text-sm">
-              <TrendingUp className="w-4 h-4" />
-              <span>+{userData.monthlyXPGain} this month</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-card p-6">
-          <div className="flex flex-col gap-2">
-            <span className="text-sm text-muted-foreground">Contest Stats</span>
-            <div className="font-mono text-3xl font-bold">{userData.totalContests}</div>
-            <div className="text-sm text-muted-foreground">
-              {userData.completedContests} completed, {userData.ongoingContests} ongoing
-            </div>
-            <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all duration-500"
-                style={{ width: `${(userData.completedContests / userData.totalContests) * 100}%` }}
-              />
-            </div>
-            <div className="text-xs text-muted-foreground">75% completion rate</div>
-          </div>
-        </div>
-
-        <div className="glass-card p-6">
-          <div className="flex flex-col gap-2">
-            <span className="text-sm text-muted-foreground">Win Rate</span>
-            <div className="font-mono text-3xl font-bold">{userData.winRate}%</div>
-            <div className="text-sm text-muted-foreground">
-              {userData.wins} wins out of {userData.totalContests}
-            </div>
-            <div className="flex items-center gap-2 text-success text-sm mt-2">
-              <TrendingUp className="w-4 h-4" />
-              <span>+5% vs last month</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Level History Timeline */}
-      <div className="glass-card p-6">
-        <h3 className="text-xl font-bold mb-6">Level History</h3>
-        <div className="relative">
-          <div className="flex justify-between items-center">
-            {levelHistory.map((level, idx) => (
-              <div key={idx} className="flex flex-col items-center gap-2 relative group">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all ${
-                    level.level <= userData.level
-                      ? "bg-success border-success"
-                      : "bg-muted border-muted"
-                  }`}
-                >
-                  <span className="font-bold">{level.level}</span>
-                </div>
-                <div className="text-center mt-2">
-                  <div className="text-xs font-bold">Level {level.level}</div>
-                  <div className="text-xs text-muted-foreground">{level.xp} XP</div>
-                </div>
-                <div className="absolute top-16 opacity-0 group-hover:opacity-100 transition-opacity bg-background border border-border rounded-lg p-3 z-10 whitespace-nowrap">
-                  <div className="text-xs font-semibold">{level.date}</div>
-                  <div className="text-xs text-muted-foreground">{level.days} days from previous</div>
-                </div>
-                {idx < levelHistory.length - 1 && (
-                  <div
-                    className={`absolute top-6 left-12 h-0.5 ${
-                      level.level < userData.level ? "bg-success" : "bg-muted"
-                    }`}
-                    style={{ width: "calc(100% + 2rem)" }}
+        <Card className="stat-card-premium glass-card hover-glow">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center">
+              <div className="relative w-28 h-28">
+                <svg className="transform -rotate-90 w-28 h-28">
+                  <circle cx="56" cy="56" r="50" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
+                  <circle
+                    cx="56"
+                    cy="56"
+                    r="50"
+                    fill="none"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="8"
+                    strokeDasharray={`${(userData.currentXP / userData.nextLevelXP) * 314} 314`}
+                    strokeLinecap="round"
+                    className="transition-all duration-500"
                   />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Contest Performance Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-bold mb-4">Win/Loss Breakdown</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie data={winLossData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                {winLossData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-4 space-y-2">
-            {winLossData.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ background: item.color }} />
-                  <span>{item.name}</span>
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">LEVEL</div>
+                    <div className="text-3xl font-bold text-primary">{userData.level}</div>
+                  </div>
                 </div>
-                <span className="font-mono">{item.value}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="text-center mt-4">
+                <div className="font-mono text-sm text-muted-foreground">
+                  {userData.currentXP} / {userData.nextLevelXP} XP
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {userData.nextLevelXP - userData.currentXP} XP to Level {userData.level + 1}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-bold mb-4">Performance by Type</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={performanceByType}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="type" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
-              <YAxis stroke="hsl(var(--muted-foreground))" />
-              <Tooltip contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }} />
-              <Bar dataKey="avgRank" fill="hsl(var(--primary))" />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="text-xs text-muted-foreground mt-2 text-center">Lower rank is better</div>
-        </div>
+        <Card className="stat-card-premium glass-card hover-glow">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-muted-foreground">Total XP</span>
+              <div className="font-mono text-3xl font-bold gradient-text">{stats.totalXP} XP</div>
+              <div className="flex items-center gap-2 text-success text-sm">
+                <TrendingUp className="w-4 h-4" />
+                <span>{stats.totalTransactions} activities</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-bold mb-4">XP Over Time</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={xpOverTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
-              <YAxis stroke="hsl(var(--muted-foreground))" />
-              <Tooltip contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }} />
-              <Line type="monotone" dataKey="xp" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))" }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <Card className="stat-card-premium glass-card hover-glow">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-muted-foreground">Login Streak</span>
+              <div className="font-mono text-3xl font-bold gradient-text">{stats.streak} days</div>
+              <div className="text-sm text-muted-foreground">
+                {stats.totalLogins} total logins
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="stat-card-premium glass-card hover-glow">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-muted-foreground">Circle Activity</span>
+              <div className="font-mono text-3xl font-bold gradient-text">{stats.circleActivityScore.toFixed(1)}</div>
+              <div className="text-sm text-muted-foreground">
+                {stats.postsCount} posts, {stats.commentsCount} comments
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Points Breakdown and Badge Progress */}
+      {/* Circle Activity vs Web App Activity Comparison - PREMIUM ENHANCEMENT */}
+      <Card className="glass-card-premium hover-glow">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 gradient-text">
+            <Activity className="w-5 h-5" />
+            Circle Activity vs Web App Activity
+          </CardTitle>
+          <CardDescription>Real-time comparison of your activity across platforms</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <AreaChart data={combinedActivityData}>
+              <defs>
+                <linearGradient id="colorWebApp" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorCircle" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+              <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
+              <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
+              <Tooltip 
+                contentStyle={{ 
+                  background: "hsl(var(--background))", 
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px"
+                }} 
+              />
+              <Legend />
+              <Area 
+                yAxisId="left"
+                type="monotone" 
+                dataKey="webAppXP" 
+                stroke="hsl(var(--primary))" 
+                fillOpacity={1} 
+                fill="url(#colorWebApp)"
+                name="Web App XP"
+              />
+              <Area 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="circleActivity" 
+                stroke="hsl(var(--success))" 
+                fillOpacity={1} 
+                fill="url(#colorCircle)"
+                name="Circle Activity Score"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* XP Over Time Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-bold mb-4">Points Breakdown</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie data={pointsBreakdown} cx="50%" cy="50%" outerRadius={100} dataKey="value" label>
-                {pointsBreakdown.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-4 space-y-2">
-            {pointsBreakdown.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ background: COLORS[idx] }} />
-                  <span>{item.name}</span>
-                </div>
-                <span className="font-mono">{item.xp} XP ({item.value}%)</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Card className="glass-card-premium hover-glow">
+          <CardHeader>
+            <CardTitle className="gradient-text">XP Gained (Last 30 Days)</CardTitle>
+            <CardDescription>Daily XP from web app activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={xpDailyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                <YAxis stroke="hsl(var(--muted-foreground))" />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: "hsl(var(--background))", 
+                    border: "1px solid hsl(var(--border))" 
+                  }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="xp" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2} 
+                  dot={{ fill: "hsl(var(--primary))", r: 4 }} 
+                  name="XP"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-bold mb-4">Badge Collection Progress</h3>
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-2xl font-bold">8 of 22 badges earned</span>
-                <span className="text-muted-foreground">36%</span>
-              </div>
-              <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-500" style={{ width: "36%" }} />
-              </div>
-            </div>
-            <div className="space-y-3">
-              {[
-                { name: "Achievement", current: 2, total: 4 },
-                { name: "Consistency", current: 3, total: 4 },
-                { name: "Community", current: 1, total: 5 },
-                { name: "Course", current: 2, total: 6 },
-                { name: "LEAP", current: 0, total: 2 },
-              ].map((cat, idx) => (
-                <div key={idx}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm">{cat.name}</span>
-                    <span className="text-sm font-mono text-muted-foreground">
-                      {cat.current}/{cat.total}
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{ width: `${(cat.current / cat.total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <Card className="glass-card-premium hover-glow">
+          <CardHeader>
+            <CardTitle className="gradient-text">XP Gained (Last 12 Months)</CardTitle>
+            <CardDescription>Monthly XP summary</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={xpMonthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                <YAxis stroke="hsl(var(--muted-foreground))" />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: "hsl(var(--background))", 
+                    border: "1px solid hsl(var(--border))" 
+                  }} 
+                />
+                <Bar dataKey="xp" fill="hsl(var(--primary))" name="XP" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Monthly Comparison */}
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-bold mb-6">Monthly Comparison</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Circle Activity Scores */}
+      {circleActivityData.length > 0 && (
+        <Card className="glass-card-premium hover-glow">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 gradient-text">
+              <Zap className="w-5 h-5" />
+              Circle.so Activity Scores
+            </CardTitle>
+            <CardDescription>Your activity metrics from Circle.so community</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={circleActivityData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                <YAxis stroke="hsl(var(--muted-foreground))" />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: "hsl(var(--background))", 
+                    border: "1px solid hsl(var(--border))" 
+                  }} 
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="activity" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2} 
+                  name="Activity Score"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="presence" 
+                  stroke="hsl(var(--success))" 
+                  strokeWidth={2} 
+                  name="Presence"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="participation" 
+                  stroke="hsl(var(--warning))" 
+                  strokeWidth={2} 
+                  name="Participation"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="contribution" 
+                  stroke="hsl(var(--accent))" 
+                  strokeWidth={2} 
+                  name="Contribution"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="connection" 
+                  stroke="hsl(var(--muted-foreground))" 
+                  strokeWidth={2} 
+                  name="Connection"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Circle Posts & Comments */}
+      {circleActivityData.length > 0 && (
+        <Card className="glass-card-premium hover-glow">
+          <CardHeader>
+            <CardTitle className="gradient-text">Circle.so Engagement</CardTitle>
+            <CardDescription>Posts and comments activity</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={circleActivityData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                <YAxis stroke="hsl(var(--muted-foreground))" />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: "hsl(var(--background))", 
+                    border: "1px solid hsl(var(--border))" 
+                  }} 
+                />
+                <Legend />
+                <Bar dataKey="posts" fill="hsl(var(--primary))" name="Posts" />
+                <Bar dataKey="comments" fill="hsl(var(--success))" name="Comments" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Activity Breakdown and Login Streak */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="glass-card-premium hover-glow">
+          <CardHeader>
+            <CardTitle className="gradient-text">Activity Breakdown</CardTitle>
+            <CardDescription>XP earned by activity type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie 
+                  data={activityByTypeData} 
+                  cx="50%" 
+                  cy="50%" 
+                  innerRadius={60} 
+                  outerRadius={100} 
+                  paddingAngle={5} 
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value}`}
+                >
+                  {activityByTypeData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    background: "hsl(var(--background))", 
+                    border: "1px solid hsl(var(--border))" 
+                  }} 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card-premium hover-glow">
+          <CardHeader>
+            <CardTitle className="gradient-text">Daily Login Streak & XP</CardTitle>
+            <CardDescription>Your login consistency and rewards</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={loginStreakData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
+                <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: "hsl(var(--background))", 
+                    border: "1px solid hsl(var(--border))" 
+                  }} 
+                />
+                <Legend />
+                <Bar yAxisId="left" dataKey="streak" fill="hsl(var(--primary))" name="Streak Days" />
+                <Bar yAxisId="right" dataKey="xp" fill="hsl(var(--success))" name="XP Earned" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activities */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activities</CardTitle>
+          <CardDescription>Your latest XP-earning activities</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-4">
-            <h4 className="font-semibold text-primary">This Month</h4>
-            {[
-              { label: "XP Earned", value: "847" },
-              { label: "Contests", value: "8" },
-              { label: "Badges", value: "2" },
-              { label: "Average Rank", value: "4.1" },
-            ].map((stat, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-background/50 rounded-lg">
-                <span className="text-sm text-muted-foreground">{stat.label}</span>
-                <span className="font-mono text-xl font-bold">{stat.value}</span>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-4">
-            <h4 className="font-semibold">Last Month</h4>
-            {[
-              { label: "XP Earned", value: "693", change: "+22%", up: true },
-              { label: "Contests", value: "6", change: "+33%", up: true },
-              { label: "Badges", value: "1", change: "+100%", up: true },
-              { label: "Average Rank", value: "5.3", change: "-23%", up: true },
-            ].map((stat, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-background/50 rounded-lg">
-                <span className="text-sm text-muted-foreground">{stat.label}</span>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xl">{stat.value}</span>
-                  <span className={`text-xs font-semibold ${stat.up ? "text-success" : "text-destructive"}`}>
-                    {stat.change} {stat.up ? "↑" : "↓"}
-                  </span>
+            {progressData.recentActivities.length > 0 ? (
+              progressData.recentActivities.map((activity, idx) => (
+                <div key={idx} className="flex items-center gap-3 pb-4 border-b border-border last:border-0 last:pb-0">
+                  <div className="w-2 h-2 rounded-full bg-primary" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{activity.timeAgo}</p>
+                  </div>
+                  <div className="font-mono text-sm text-primary">+{activity.xp} XP</div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">No recent activities</p>
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Insights */}
-      <div className="glass-card p-6 bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Award className="w-5 h-5 text-primary" />
-          Insights & Predictions
-        </h3>
-        <div className="space-y-3">
-          <p className="text-sm">📈 At your current pace, you'll reach Level 7 in <span className="font-bold text-primary">12 days</span></p>
-          <p className="text-sm">🎯 Your best contest type: <span className="font-bold text-primary">Quality Challenges</span> (Avg rank: 2.3)</p>
-          <p className="text-sm">🎖️ You need <span className="font-bold text-primary">2 more Achievement badges</span> to qualify for LEAP</p>
-          <p className="text-sm">📅 Most active day: <span className="font-bold text-primary">Friday</span> (5 contests)</p>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-bold mb-4">Recent Activity</h3>
-        <div className="space-y-4">
-          {recentActivities.map((activity, idx) => (
-            <div key={idx} className="flex items-center gap-3 pb-4 border-b border-border last:border-0 last:pb-0">
-              <div className="w-2 h-2 rounded-full bg-primary" />
-              <div className="flex-1">
-                <p className="text-sm">{activity.text}</p>
-                <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
-              </div>
-              <div className="font-mono text-sm text-primary">+{activity.xp} XP</div>
-            </div>
-          ))}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
