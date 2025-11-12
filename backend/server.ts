@@ -445,9 +445,37 @@ app.get('/api/member-spaces', (req, res) => {
   getMemberSpacesHandler(req, res);
 });
 
+// Serve frontend static files in production (if frontend is built and in dist folder)
+// This allows the backend to serve the React app for SPA routing
+if (process.env.NODE_ENV === 'production') {
+  const frontendDistPath = path.resolve(__dirname, '../dist');
+  
+  // Use dynamic import for fs to avoid issues
+  import('fs').then((fs) => {
+    // Check if dist folder exists
+    if (fs.existsSync(frontendDistPath)) {
+      console.log('📦 Serving frontend static files from:', frontendDistPath);
+      app.use(express.static(frontendDistPath));
+      
+      // SPA routing: serve index.html for all non-API routes
+      app.get('*', (req, res) => {
+        // Don't serve index.html for API routes
+        if (req.path.startsWith('/api/')) {
+          return res.status(404).json({ error: 'API endpoint not found' });
+        }
+        res.sendFile(path.join(frontendDistPath, 'index.html'));
+      });
+    } else {
+      console.log('⚠️ Frontend dist folder not found. Assuming frontend is served separately.');
+    }
+  }).catch((err) => {
+    console.log('⚠️ Could not check for frontend dist folder:', err.message);
+  });
+}
+
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 API server running on http://localhost:${PORT}`);
+  console.log(`🚀 API server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? '✓ Configured' : '✗ Missing'}`);
   console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com'}`);
