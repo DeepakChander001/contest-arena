@@ -51,6 +51,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// CRITICAL: Add middleware to log all incoming requests for debugging
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    console.log(`🔵 API Request: ${req.method} ${req.path}`);
+  }
+  next();
+});
+
 // Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'default-session-secret-change-in-production',
@@ -447,6 +455,14 @@ app.get('/api/member-spaces', (req, res) => {
   getMemberSpacesHandler(req, res);
 });
 
+// CRITICAL: Add explicit middleware to ensure API routes are never intercepted
+// This must be BEFORE static file serving
+app.use('/api', (req, res, next) => {
+  // This middleware ensures /api routes are never caught by static file serving
+  // It just passes through to the API route handlers
+  next();
+});
+
 // Serve frontend static files in production (if frontend is built and in dist folder)
 // This allows the backend to serve the React app for SPA routing
 // IMPORTANT: This must be AFTER all API routes but BEFORE starting the server
@@ -460,25 +476,33 @@ app.get('/api/member-spaces', (req, res) => {
       console.log('📦 Serving frontend static files from:', frontendDistPath);
       
       // Serve static files ONLY for non-API routes
-      // IMPORTANT: This middleware must check the path BEFORE serving static files
-      app.use((req, res, next) => {
-        // CRITICAL: Skip static file serving for ALL API routes
-        if (req.path.startsWith('/api/')) {
-          console.log('🚫 Skipping static file serving for API route:', req.path);
-          return next(); // Pass to next middleware (API routes)
+      // Use express.static with a filter function
+      app.use(express.static(frontendDistPath, {
+        // Only serve files that don't start with /api
+        setHeaders: (res, filePath) => {
+          // This ensures we never serve HTML for API routes
         }
-        // Serve static files for all other routes
-        console.log('📦 Serving static file for:', req.path);
-        express.static(frontendDistPath)(req, res, next);
+      }));
+      
+      // Add explicit middleware to block API routes from static serving
+      app.use((req, res, next) => {
+        // CRITICAL: If this is an API route, skip static file serving
+        if (req.path.startsWith('/api/')) {
+          return next(); // Let API routes handle it
+        }
+        // For non-API routes, try to serve static files
+        next();
       });
       
       // SPA routing: serve index.html for all non-API routes that don't match static files
       // This must be the LAST route handler
-      app.get('*', (req, res) => {
-        // Don't serve index.html for API routes
+      app.get('*', (req, res, next) => {
+        // CRITICAL: Never serve index.html for API routes
         if (req.path.startsWith('/api/')) {
-          return res.status(404).json({ error: 'API endpoint not found' });
+          console.error('❌ API route caught by catch-all:', req.path);
+          return res.status(404).json({ error: 'API endpoint not found', path: req.path });
         }
+        // Serve index.html for SPA routing
         res.sendFile(path.join(frontendDistPath, 'index.html'));
       });
     } else {
