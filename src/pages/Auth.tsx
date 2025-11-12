@@ -79,41 +79,7 @@ const Auth = () => {
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('google_credential', credential);
 
-      // Optional: Sync with backend if configured (backend handles Circle API calls to avoid CORS)
-      const API_URL = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
-      if (API_URL) {
-        try {
-          const response = await fetch(`${API_URL}/api/auth/complete`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: userInfo.email,
-              credential: credential
-            })
-          });
-
-          // Only parse if response is JSON
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json') && response.ok) {
-            const data = await response.json();
-            console.log('✅ Backend sync complete');
-            
-            // Store any additional data from backend
-            if (data.user) {
-              const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-              localStorage.setItem('user', JSON.stringify({
-                ...currentUser,
-                ...data.user
-              }));
-            }
-          }
-        } catch (error) {
-          console.log('ℹ️ Backend sync skipped (optional)');
-        }
-      }
+      console.log('✅ User data saved locally');
 
       // Map to format expected by AuthContext
       const googleUserData = {
