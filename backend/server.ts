@@ -475,23 +475,31 @@ app.use('/api', (req, res, next) => {
     if (fs.existsSync(frontendDistPath)) {
       console.log('📦 Serving frontend static files from:', frontendDistPath);
       
-      // Serve static files ONLY for non-API routes
-      // Use express.static with a filter function
-      app.use(express.static(frontendDistPath, {
-        // Only serve files that don't start with /api
-        setHeaders: (res, filePath) => {
-          // This ensures we never serve HTML for API routes
-        }
-      }));
+      // CRITICAL: Wrap express.static() in middleware that checks path FIRST
+      // This ensures API routes are NEVER served static files
+      const staticFileHandler = express.static(frontendDistPath, {
+        index: false, // Don't auto-serve index.html
+      });
       
-      // Add explicit middleware to block API routes from static serving
+      // Middleware that wraps static file serving - checks path BEFORE serving
       app.use((req, res, next) => {
-        // CRITICAL: If this is an API route, skip static file serving
+        // CRITICAL: Skip static file serving for ALL API routes
         if (req.path.startsWith('/api/')) {
-          return next(); // Let API routes handle it
+          console.log('🚫 Skipping static file serving for API route:', req.path);
+          return next(); // Pass to API route handlers - don't serve static files
         }
         // For non-API routes, try to serve static files
-        next();
+        // If file not found, staticFileHandler will call next() automatically
+        staticFileHandler(req, res, (err) => {
+          // If static file not found (404), pass to next middleware (SPA routing)
+          if (err && err.status === 404) {
+            return next();
+          }
+          // If other error, pass it along
+          if (err) {
+            return next(err);
+          }
+        });
       });
       
       // SPA routing: serve index.html for all non-API routes that don't match static files
