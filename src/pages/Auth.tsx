@@ -21,134 +21,6 @@ const Auth = () => {
   
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // Fallback: Fetch Circle data from your backend (to avoid CORS)
-  const fetchCircleFromBackend = async (email: string) => {
-    try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
-      
-      console.log('🔄 Fetching Circle data from backend...');
-      
-      const response = await fetch(`${API_URL}/api/member?email=${encodeURIComponent(email)}`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.id) {
-            console.log('✅ Circle member fetched via backend');
-            localStorage.setItem('circle_member', JSON.stringify(data));
-          }
-        }
-      }
-    } catch (error) {
-      console.log('ℹ️ Backend Circle fetch failed (non-blocking)');
-    }
-  };
-
-  // Sync with Circle using Headless API (optional, non-blocking)
-  const syncWithCircle = async (email: string) => {
-    try {
-      const CIRCLE_API_KEY = import.meta.env.VITE_CIRCLE_HEADLESS_API_KEY;
-      
-      if (!CIRCLE_API_KEY) {
-        console.log('ℹ️ Circle Headless API not configured, trying backend...');
-        await fetchCircleFromBackend(email);
-        return;
-      }
-
-      console.log('🔄 Syncing with Circle Headless API...');
-      
-      // For headless API, use Bearer token and no community_id needed
-      const response = await fetch(`https://app.circle.so/api/v1/members?email=${encodeURIComponent(email)}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${CIRCLE_API_KEY}`, // Headless API uses Bearer token
-          'Accept': 'application/json',
-        }
-      });
-
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.log('⚠️ Circle API returned non-JSON response, trying backend...');
-        await fetchCircleFromBackend(email);
-        return;
-      }
-
-      if (!response.ok) {
-        console.log(`⚠️ Circle API returned status ${response.status}, trying backend...`);
-        await fetchCircleFromBackend(email);
-        return;
-      }
-
-      const data = await response.json();
-      
-      if (data && (data.member || data.data || (Array.isArray(data) && data.length > 0))) {
-        const member = data.member || data.data || (Array.isArray(data) ? data[0] : null);
-        if (member) {
-          console.log('✅ Circle member found');
-          localStorage.setItem('circle_member', JSON.stringify(member));
-        }
-      } else {
-        console.log('ℹ️ User not found in Circle community');
-      }
-      
-    } catch (error) {
-      console.log('ℹ️ Circle sync failed (non-blocking), trying backend...', error);
-      // Try backend fallback
-      await fetchCircleFromBackend(email);
-    }
-  };
-
-  // Sync with your backend (optional)
-  const syncWithBackend = async (userInfo: any, credential: string) => {
-    try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
-      
-      console.log('🔄 Syncing with backend...');
-      
-      const response = await fetch(`${API_URL}/api/auth/google`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${credential}`
-        },
-        body: JSON.stringify({
-          email: userInfo.email,
-          name: userInfo.name,
-          credential: credential
-        })
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        if (response.ok) {
-          const data = await response.json();
-          console.log('✅ Backend sync successful');
-          
-          // Store any additional data from backend
-          if (data.user) {
-            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-            localStorage.setItem('user', JSON.stringify({
-              ...currentUser,
-              ...data.user
-            }));
-          }
-        }
-      } else {
-        console.log('⚠️ Backend returned non-JSON response');
-      }
-    } catch (error) {
-      console.log('ℹ️ Backend sync failed (non-blocking):', error);
-    }
-  };
 
   // Handle Google callback - make it available globally and stable with useCallback
   const handleGoogleCallback = useCallback(async (response: any) => {
@@ -207,11 +79,41 @@ const Auth = () => {
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('google_credential', credential);
 
-      // Sync with Circle (headless API, optional, non-blocking)
-      await syncWithCircle(userInfo.email);
+      // Optional: Sync with backend if configured (backend handles Circle API calls to avoid CORS)
+      const API_URL = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
+      if (API_URL) {
+        try {
+          const response = await fetch(`${API_URL}/api/auth/complete`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: userInfo.email,
+              credential: credential
+            })
+          });
 
-      // Optional: Sync with your backend
-      await syncWithBackend(userInfo, credential);
+          // Only parse if response is JSON
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json') && response.ok) {
+            const data = await response.json();
+            console.log('✅ Backend sync complete');
+            
+            // Store any additional data from backend
+            if (data.user) {
+              const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+              localStorage.setItem('user', JSON.stringify({
+                ...currentUser,
+                ...data.user
+              }));
+            }
+          }
+        } catch (error) {
+          console.log('ℹ️ Backend sync skipped (optional)');
+        }
+      }
 
       // Map to format expected by AuthContext
       const googleUserData = {
@@ -221,7 +123,7 @@ const Auth = () => {
         sub: userInfo.sub,
       };
 
-      // Try to process login with Circle data (with graceful fallback)
+      // Try to process login with Circle data via AuthContext (with graceful fallback)
       try {
         await handleAuthLogin(googleUserData);
         // If successful, redirect will happen in handleAuthLogin
