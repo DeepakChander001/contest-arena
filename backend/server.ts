@@ -473,21 +473,23 @@ if (process.env.NODE_ENV === 'production') {
     if (fs.existsSync(frontendDistPath)) {
       console.log('📦 Serving frontend static files from:', frontendDistPath);
       
+      // CRITICAL: Create static file handler ONCE (not on every request)
+      const staticHandler = express.static(frontendDistPath, {
+        index: false, // Don't auto-serve index.html
+      });
+      
       // CRITICAL: Create a middleware that ONLY serves static files for NON-API routes
       // We explicitly check the path BEFORE calling express.static()
       app.use((req, res, next) => {
         // CRITICAL: NEVER serve static files for API routes
+        // Check both the path and ensure we're not matching API routes
         if (req.path.startsWith('/api/')) {
           // This is an API route - skip static file serving completely
+          console.log('🚫 API route detected, skipping static file serving:', req.path);
           return next(); // Pass to API route handlers
         }
         
         // This is NOT an API route - try to serve static file
-        // Use express.static() but only for non-API routes
-        const staticHandler = express.static(frontendDistPath, {
-          index: false, // Don't auto-serve index.html
-        });
-        
         staticHandler(req, res, (err) => {
           // If static file not found (404), pass to next middleware (SPA routing)
           if (err && err.status === 404) {
