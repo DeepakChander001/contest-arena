@@ -1,0 +1,4 @@
+# Netlify redirects for SPA routing
+/api/*  https://leaderboard.1to10x.com/api/:splat  200
+/*      /index.html  200
+
