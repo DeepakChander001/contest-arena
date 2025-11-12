@@ -14,9 +14,25 @@ interface GoogleUserInfo {
 const Auth = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [clientIdReady, setClientIdReady] = useState(false);
   
   const { isAuthenticated, user, handleGoogleLogin: handleAuthLogin } = useAuth();
   const navigate = useNavigate();
+
+  // Check if Google Client ID is configured
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (clientId) {
+      console.log('✅ Google Client ID found');
+      setClientIdReady(true);
+    } else {
+      console.error('❌ Google Client ID is missing!');
+      setMessage({ 
+        type: 'error', 
+        text: 'Google Sign-In is not configured. Please contact support or check environment variables.' 
+      });
+    }
+  }, []);
 
   // If user is already authenticated, redirect to dashboard
   useEffect(() => {
@@ -77,6 +93,72 @@ const Auth = () => {
     },
   });
 
+  // Fallback manual OAuth flow (if useGoogleLogin fails)
+  const handleManualGoogleSignIn = () => {
+    console.log('🔄 Using manual Google Sign-In fallback');
+    setLoading(true);
+    setMessage(null);
+
+    const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    
+    if (!GOOGLE_CLIENT_ID) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Google Sign-In is not configured. Please contact support.' 
+      });
+      setLoading(false);
+      return;
+    }
+
+    // OAuth 2.0 endpoint
+    const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+    
+    // Build the OAuth URL
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: `${window.location.origin}/auth/callback`,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: Math.random().toString(36).substring(7), // Random state for security
+    });
+
+    // Redirect to Google OAuth
+    const authUrl = `${googleAuthUrl}?${params.toString()}`;
+    console.log('🔄 Redirecting to Google OAuth:', authUrl);
+    window.location.href = authUrl;
+  };
+
+  // Handle button click with error handling
+  const handleButtonClick = () => {
+    console.log('🖱️ Sign in button clicked');
+    console.log('📊 Client ID Ready:', clientIdReady);
+    console.log('📊 Loading:', loading);
+    
+    if (loading) {
+      console.log('⏳ Already processing, ignoring click');
+      return;
+    }
+
+    if (!clientIdReady) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Google Sign-In is not configured. Please contact support.' 
+      });
+      return;
+    }
+
+    try {
+      // Try the useGoogleLogin hook first
+      login();
+    } catch (error) {
+      console.error('❌ Error calling login function:', error);
+      // Fallback to manual OAuth
+      handleManualGoogleSignIn();
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       {/* Animated background gradient */}
@@ -120,11 +202,12 @@ const Auth = () => {
             )}
 
             <button
-              onClick={() => login()}
-              disabled={loading}
+              onClick={handleButtonClick}
+              disabled={loading || !clientIdReady}
               className={`w-full bg-white hover:bg-gray-50 text-gray-800 font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 border border-gray-300 shadow-lg hover:shadow-xl ${
-                loading ? 'opacity-50 cursor-not-allowed' : ''
+                loading || !clientIdReady ? 'opacity-50 cursor-not-allowed' : ''
               }`}
+              type="button"
             >
               {loading ? (
                 <>

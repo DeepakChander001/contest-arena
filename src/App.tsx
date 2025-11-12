@@ -20,6 +20,7 @@ import EditProfile from "./pages/EditProfile";
 import DailyRewards from "./pages/DailyRewards";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import CreateProfile from "./pages/CreateProfile";
 import NotFound from "./pages/NotFound";
 
@@ -36,6 +37,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/create-profile" element={<CreateProfile />} />
             <Route 
               path="/dashboard" 
