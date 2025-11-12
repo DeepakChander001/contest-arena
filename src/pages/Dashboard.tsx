@@ -173,7 +173,7 @@ const Dashboard = () => {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <h2 className="text-2xl font-bold">Please log in to view your dashboard</h2>
-          <Button onClick={() => window.location.href = '/auth'}>
+          <Button onClick={() => navigate('/auth')}>
             Go to Login
           </Button>
         </div>
