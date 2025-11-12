@@ -27,38 +27,40 @@ import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
-// Add global styles to prevent React from interfering with Google Sign-In button
-useEffect(() => {
-  const style = document.createElement('style');
-  style.innerHTML = `
-    /* Prevent React from interfering with Google Sign-In button */
-    #google-button-div > * {
-      pointer-events: auto !important;
-    }
+// Component to add global styles for Google Sign-In
+const GoogleSignInStyles = () => {
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.id = 'google-signin-styles';
+    style.innerHTML = `
+      /* Prevent React from interfering with Google Sign-In button */
+      #google-button-div > * {
+        pointer-events: auto !important;
+      }
+      
+      /* Ensure Google button is clickable */
+      .nsm7Bb-HzV7m-LgbsSe {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+      }
+      
+    `;
+    document.head.appendChild(style);
     
-    /* Ensure Google button is clickable */
-    .nsm7Bb-HzV7m-LgbsSe {
-      pointer-events: auto !important;
-      cursor: pointer !important;
-    }
-    
-    /* Prevent React from removing Google button */
-    #google-button-div {
-      position: relative;
-    }
-  `;
-  document.head.appendChild(style);
+    return () => {
+      const existingStyle = document.getElementById('google-signin-styles');
+      if (existingStyle) {
+        document.head.removeChild(existingStyle);
+      }
+    };
+  }, []);
   
-  return () => {
-    // Cleanup on unmount
-    if (document.head.contains(style)) {
-      document.head.removeChild(style);
-    }
-  };
-}, []);
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <GoogleSignInStyles />
     <TooltipProvider>
       <ThemeProvider>
         <AuthProvider>
