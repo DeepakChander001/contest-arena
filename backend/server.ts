@@ -456,9 +456,18 @@ app.get('/api/member-spaces', (req, res) => {
     // Check if dist folder exists
     if (fs.existsSync(frontendDistPath)) {
       console.log('📦 Serving frontend static files from:', frontendDistPath);
-      app.use(express.static(frontendDistPath));
       
-      // SPA routing: serve index.html for all non-API routes
+      // Serve static files ONLY for non-API routes
+      app.use((req, res, next) => {
+        // Skip static file serving for API routes
+        if (req.path.startsWith('/api/')) {
+          return next();
+        }
+        // Serve static files for all other routes
+        express.static(frontendDistPath)(req, res, next);
+      });
+      
+      // SPA routing: serve index.html for all non-API routes that don't match static files
       // This must be the LAST route handler
       app.get('*', (req, res) => {
         // Don't serve index.html for API routes
