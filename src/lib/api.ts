@@ -103,7 +103,15 @@ class ApiService {
     try {
       const response = await fetch(circleUrl, { credentials: 'include' as RequestCredentials });
       
+      // Check content-type before parsing
+      const contentType = response.headers.get('content-type');
+      const isJSON = contentType && contentType.includes('application/json');
+      
       if (response.ok) {
+        if (!isJSON) {
+          console.warn('⚠️ Response is not JSON, content-type:', contentType);
+          throw new Error('API returned non-JSON response');
+        }
         const data = await response.json();
         console.log('✅ User data fetched from Circle API');
         return data;
@@ -111,13 +119,36 @@ class ApiService {
       
       // If 404, user not found in Circle
       if (response.status === 404) {
-        const errorData = await response.json().catch(() => ({}));
+        // Try to parse error message, but handle HTML responses
+        let errorData: any = {};
+        if (isJSON) {
+          try {
+            errorData = await response.json();
+          } catch (e) {
+            console.warn('⚠️ Could not parse 404 response as JSON');
+          }
+        } else {
+          // If HTML response, just mark as not found
+          console.warn('⚠️ 404 response is HTML, not JSON');
+        }
         const error: any = new Error(errorData.message || 'Member not found in Circle');
         error.notFound = true;
         throw error;
       }
       
-      throw new Error(`Failed to fetch member data: ${response.statusText}`);
+      // For other errors, check if response is JSON
+      if (isJSON) {
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Failed to fetch member data: ${response.statusText}`);
+        } catch (parseError) {
+          throw new Error(`Failed to fetch member data: ${response.statusText}`);
+        }
+      } else {
+        // HTML error page or other non-JSON response
+        console.warn('⚠️ API returned non-JSON error response');
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
     } catch (error: any) {
       // If Circle API fails, try database as fallback
       if (!error.notFound) {
@@ -128,8 +159,13 @@ class ApiService {
           const dbResponse = await fetch(dbUrl, { credentials: 'include' as RequestCredentials });
           
           if (dbResponse.ok) {
-            console.log('✅ User data fetched from database (fallback)');
-            return dbResponse.json();
+            const contentType = dbResponse.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              console.log('✅ User data fetched from database (fallback)');
+              return dbResponse.json();
+            } else {
+              console.warn('⚠️ Database response is not JSON');
+            }
           }
         } catch (dbError) {
           console.log('⚠️ Database fetch also failed');
@@ -143,29 +179,54 @@ class ApiService {
 
   // Get member spaces (courses) from Circle.so
   async getMemberSpaces(memberId: string): Promise<MemberSpaces[]> {
-    const response = await fetch(`${this.baseUrl}/api/member/spaces?memberId=${encodeURIComponent(memberId)}`, {
-      credentials: 'include' as RequestCredentials,
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch member spaces: ${response.statusText}`);
-    }
+    try {
+      const response = await fetch(`${this.baseUrl}/api/member/spaces?memberId=${encodeURIComponent(memberId)}`, {
+        credentials: 'include' as RequestCredentials,
+      });
+      
+      // Check content-type before parsing
+      const contentType = response.headers.get('content-type');
+      const isJSON = contentType && contentType.includes('application/json');
+      
+      if (!response.ok) {
+        if (isJSON) {
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Failed to fetch member spaces: ${response.statusText}`);
+          } catch (parseError) {
+            throw new Error(`Failed to fetch member spaces: ${response.statusText}`);
+          }
+        } else {
+          console.warn('⚠️ Spaces API returned non-JSON error response');
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+      }
 
-    const data = await response.json();
-    
-    // Handle different response formats:
-    // 1. If it's already an array, return it
-    // 2. If it's an object with 'records' property (Circle.so paginated response), return records
-    // 3. If it's an object with 'spaces' property, return spaces
-    // 4. Otherwise, return empty array
-    if (Array.isArray(data)) {
-      return data;
-    } else if (data && Array.isArray(data.records)) {
-      return data.records;
-    } else if (data && Array.isArray(data.spaces)) {
-      return data.spaces;
-    } else {
-      console.warn('⚠️ Unexpected spaces response format:', data);
+      if (!isJSON) {
+        console.warn('⚠️ Spaces response is not JSON, returning empty array');
+        return [];
+      }
+
+      const data = await response.json();
+      
+      // Handle different response formats:
+      // 1. If it's already an array, return it
+      // 2. If it's an object with 'records' property (Circle.so paginated response), return records
+      // 3. If it's an object with 'spaces' property, return spaces
+      // 4. Otherwise, return empty array
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.records)) {
+        return data.records;
+      } else if (data && Array.isArray(data.spaces)) {
+        return data.spaces;
+      } else {
+        console.warn('⚠️ Unexpected spaces response format:', data);
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error fetching member spaces:', error);
+      // Return empty array instead of throwing - spaces are optional
       return [];
     }
   }

@@ -20,7 +20,7 @@ const Auth = () => {
   
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // Handle Google sign-in response
+  // Handle Google sign-in response with improved error handling
   const handleCredentialResponse = async (response: any) => {
     console.log('✅ Sign-in response received');
     setLoading(true);
@@ -45,6 +45,19 @@ const Auth = () => {
       const userInfo = JSON.parse(jsonPayload);
       console.log("✅ User authenticated:", userInfo.email);
 
+      // Save basic user data first (before Circle API call)
+      const basicUserData = {
+        email: userInfo.email,
+        name: userInfo.name,
+        picture: userInfo.picture,
+        sub: userInfo.sub,
+        email_verified: userInfo.email_verified,
+        loginTime: new Date().toISOString()
+      };
+
+      localStorage.setItem('user', JSON.stringify(basicUserData));
+      localStorage.setItem('google_credential', credential);
+
       // Map to format expected by AuthContext
       const googleUserData = {
         email: userInfo.email,
@@ -53,15 +66,33 @@ const Auth = () => {
         sub: userInfo.sub,
       };
 
-      // Call AuthContext handler to process the login (fetches Circle data)
-      await handleAuthLogin(googleUserData);
-      
-      // Navigate using window.location to avoid React issues
-      window.location.href = '/dashboard';
+      // Try to process login with Circle data (with graceful fallback)
+      try {
+        await handleAuthLogin(googleUserData);
+        // If successful, redirect will happen in handleAuthLogin
+      } catch (circleError: any) {
+        console.warn('⚠️ Circle API error, continuing with basic Google data:', circleError);
+        
+        // Check if it's a "not found" error - redirect to profile creation
+        if (circleError?.message?.includes('not found') || 
+            circleError?.message?.includes('404') || 
+            circleError?.notFound) {
+          console.log('⚠️ User not found in Circle, redirecting to profile creation');
+          window.location.href = `/create-profile?email=${encodeURIComponent(userInfo.email)}&name=${encodeURIComponent(userInfo.name || '')}`;
+          return;
+        }
+        
+        // For other errors (like HTML responses), continue with basic data
+        console.log('⚠️ Circle API returned error, using basic Google data');
+        // User data already saved, just redirect to dashboard
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 500);
+      }
       
     } catch (err: any) {
       console.error('❌ Sign-in error:', err);
-      setMessage({ type: 'error', text: err.message || 'Failed to complete sign-in' });
+      setMessage({ type: 'error', text: err.message || 'Failed to complete sign-in. Please try again.' });
       setLoading(false);
     }
   };
