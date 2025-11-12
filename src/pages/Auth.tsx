@@ -1,11 +1,12 @@
 import { AlertCircle, CheckCircle } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 declare global {
   interface Window {
     google: any;
+    handleGoogleCallback: (response: any) => void;
   }
 }
 
@@ -20,20 +21,31 @@ const Auth = () => {
   
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // Handle Google sign-in response with improved error handling
-  const handleCredentialResponse = async (response: any) => {
-    console.log('✅ Sign-in response received');
+  // Handle Google callback - make it available globally and stable with useCallback
+  const handleGoogleCallback = useCallback((response: any) => {
+    console.log('🎯 Google callback triggered!');
+    console.log('Response:', response);
+    
+    if (response.error) {
+      console.error('❌ Google Sign-In error:', response.error);
+      setMessage({ type: 'error', text: `Sign-in failed: ${response.error}` });
+      setLoading(false);
+      return;
+    }
+
+    if (!response.credential) {
+      console.error('❌ No credential in response');
+      setMessage({ type: 'error', text: 'No credential received from Google' });
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
     try {
+      // Decode JWT token
       const credential = response.credential;
-      
-      if (!credential) {
-        throw new Error('No credential received');
-      }
-
-      // Decode JWT
       const base64Url = credential.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const jsonPayload = decodeURIComponent(
@@ -43,7 +55,7 @@ const Auth = () => {
       );
       
       const userInfo = JSON.parse(jsonPayload);
-      console.log("✅ User authenticated:", userInfo.email);
+      console.log('✅ User authenticated:', userInfo.email);
 
       // Save basic user data first (before Circle API call)
       const basicUserData = {
@@ -67,35 +79,47 @@ const Auth = () => {
       };
 
       // Try to process login with Circle data (with graceful fallback)
-      try {
-        await handleAuthLogin(googleUserData);
-        // If successful, redirect will happen in handleAuthLogin
-      } catch (circleError: any) {
-        console.warn('⚠️ Circle API error, continuing with basic Google data:', circleError);
-        
-        // Check if it's a "not found" error - redirect to profile creation
-        if (circleError?.message?.includes('not found') || 
-            circleError?.message?.includes('404') || 
-            circleError?.notFound) {
-          console.log('⚠️ User not found in Circle, redirecting to profile creation');
-          window.location.href = `/create-profile?email=${encodeURIComponent(userInfo.email)}&name=${encodeURIComponent(userInfo.name || '')}`;
-          return;
-        }
-        
-        // For other errors (like HTML responses), continue with basic data
-        console.log('⚠️ Circle API returned error, using basic Google data');
-        // User data already saved, just redirect to dashboard
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 500);
-      }
+      handleAuthLogin(googleUserData)
+        .then(() => {
+          // If successful, redirect will happen in handleAuthLogin
+          console.log('✅ Login processed successfully');
+        })
+        .catch((circleError: any) => {
+          console.warn('⚠️ Circle API error, continuing with basic Google data:', circleError);
+          
+          // Check if it's a "not found" error - redirect to profile creation
+          if (circleError?.message?.includes('not found') || 
+              circleError?.message?.includes('404') || 
+              circleError?.notFound) {
+            console.log('⚠️ User not found in Circle, redirecting to profile creation');
+            window.location.href = `/create-profile?email=${encodeURIComponent(userInfo.email)}&name=${encodeURIComponent(userInfo.name || '')}`;
+            return;
+          }
+          
+          // For other errors (like HTML responses), continue with basic data
+          console.log('⚠️ Circle API returned error, using basic Google data');
+          // User data already saved, just redirect to dashboard
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 500);
+        });
       
     } catch (err: any) {
-      console.error('❌ Sign-in error:', err);
-      setMessage({ type: 'error', text: err.message || 'Failed to complete sign-in. Please try again.' });
+      console.error('❌ Error processing credential:', err);
+      setMessage({ type: 'error', text: err.message || 'Failed to process sign-in. Please try again.' });
       setLoading(false);
     }
-  };
+  }, [handleAuthLogin]);
+
+  // Make callback available globally so Google's iframe can call it
+  useEffect(() => {
+    window.handleGoogleCallback = handleGoogleCallback;
+    console.log('✅ Global callback function set');
+    
+    return () => {
+      delete window.handleGoogleCallback;
+    };
+  }, [handleGoogleCallback]);
 
   // Check if already authenticated
   useEffect(() => {
@@ -167,25 +191,30 @@ const Auth = () => {
     const maxAttempts = 10;
 
     const loadGoogleScript = () => {
+      // Check if script already exists
       const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
       
       if (existingScript) {
+        console.log('📜 Google script already loaded');
         waitForGoogle();
         return;
       }
 
+      console.log('📥 Loading Google Identity Services script...');
       const script = document.createElement('script');
       script.src = 'https://accounts.google.com/gsi/client';
       script.async = true;
       script.defer = true;
       
       script.onload = () => {
+        console.log('✅ Script loaded successfully');
         if (isMounted) {
           waitForGoogle();
         }
       };
 
-      script.onerror = () => {
+      script.onerror = (err) => {
+        console.error('❌ Failed to load script:', err);
         if (isMounted) {
           setMessage({ type: 'error', text: 'Failed to load Google Sign-In script' });
         }
@@ -200,35 +229,46 @@ const Auth = () => {
         
         if (window.google?.accounts?.id && isMounted) {
           clearInterval(checkInterval);
+          console.log('✅ Google object ready');
           initializeGoogleSignIn();
         } else if (initAttempts >= maxAttempts) {
           clearInterval(checkInterval);
+          console.error('❌ Google object not available after retries');
           if (isMounted) {
             setMessage({ type: 'error', text: 'Google Sign-In took too long to load' });
           }
+        } else {
+          console.log(`⏳ Waiting for Google object... (${initAttempts}/${maxAttempts})`);
         }
       }, 500);
     };
 
     const initializeGoogleSignIn = () => {
-      if (!googleButtonRef.current || !isMounted) return;
+      if (!googleButtonRef.current || !isMounted) {
+        console.log('❌ Button ref not ready or component unmounted');
+        return;
+      }
 
       try {
-        console.log('🔄 Initializing Google Sign-In...');
+        console.log('🔧 Initializing Google Sign-In...');
+        console.log('Using Client ID:', GOOGLE_CLIENT_ID);
+        console.log('Global callback available:', !!window.handleGoogleCallback);
         
         // Clear any existing content
         googleButtonRef.current.innerHTML = '';
 
-        // Initialize Google Sign-In
+        // Initialize Google Sign-In with global callback
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback: handleCredentialResponse,
+          callback: window.handleGoogleCallback, // Use global callback
           auto_select: false,
           cancel_on_tap_outside: true,
-          ux_mode: 'popup', // Explicitly set to popup mode
           context: 'signin',
+          ux_mode: 'popup',
           itp_support: true
         });
+
+        console.log('🎨 Rendering button...');
 
         // Render button with fixed width (pixels, not percentage)
         window.google.accounts.id.renderButton(
@@ -239,27 +279,26 @@ const Auth = () => {
             size: 'large',
             text: 'signin_with',
             shape: 'rectangular',
-            width: 300,
+            width: 320,
             logo_alignment: 'left',
-            click_listener: () => {
-              console.log('✅ Google button clicked!');
-            }
+            locale: 'en'
           }
         );
 
-        // Enable One Tap as backup
-        window.google.accounts.id.prompt((notification: any) => {
-          console.log('📱 One Tap status:', notification);
-        });
-
         setButtonReady(true);
-        console.log('✅ Google Sign-In initialized successfully');
+        console.log('✅ Google Sign-In button ready!');
+
+        // Optional: Enable One Tap
+        window.google.accounts.id.prompt((notification: any) => {
+          console.log('📱 One Tap status:', notification?.getMomentType?.() || notification);
+        });
         
-        // Debug: Check if button is actually rendered and clickable
+        // Debug: Check if button is actually rendered
         setTimeout(() => {
           const iframe = googleButtonRef.current?.querySelector('iframe');
           if (iframe) {
             console.log('✅ Google iframe found:', iframe);
+            console.log('Iframe src:', iframe.src);
             // Ensure iframe is interactive
             iframe.style.pointerEvents = 'auto';
             iframe.style.position = 'relative';
@@ -286,16 +325,35 @@ const Auth = () => {
     };
   }, [GOOGLE_CLIENT_ID]);
 
-  // Manual trigger for Google Sign-In
-  const triggerGoogleSignIn = () => {
-    console.log('🔄 Manual trigger clicked');
+  // Manual OAuth redirect fallback
+  const handleManualSignIn = () => {
+    console.log('🔄 Manual sign-in triggered');
     
+    if (!GOOGLE_CLIENT_ID) {
+      setMessage({ type: 'error', text: 'Google Client ID not configured' });
+      return;
+    }
+
+    // Try One Tap first
     if (window.google?.accounts?.id) {
-      // Try to trigger the sign-in programmatically
+      console.log('📱 Triggering One Tap...');
       window.google.accounts.id.prompt();
     } else {
       // Fallback to OAuth redirect
-      handleOAuthRedirect();
+      const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        access_type: 'offline',
+        prompt: 'select_account'
+      });
+
+      console.log('🔗 Redirecting to:', `${authUrl}?${params.toString()}`);
+      window.location.href = `${authUrl}?${params.toString()}`;
     }
   };
 
@@ -322,35 +380,25 @@ const Auth = () => {
     window.location.href = `${authUrl}?${params.toString()}`;
   };
 
-  // Debug function to check button status
-  const debugButton = () => {
-    const container = googleButtonRef.current;
-    if (container) {
-      const iframe = container.querySelector('iframe');
-      const buttons = container.querySelectorAll('[role="button"]');
-      
-      console.log('🔍 Debug Info:');
-      console.log('Container:', container);
-      console.log('Container computed style:', window.getComputedStyle(container));
-      console.log('Iframe:', iframe);
+  // Debug function to check Google Sign-In status
+  const debugGoogleSignIn = () => {
+    console.group('🔍 Debug Information');
+    console.log('Client ID:', GOOGLE_CLIENT_ID ? '✅ Set' : '❌ Missing');
+    console.log('Google object:', window.google ? '✅ Loaded' : '❌ Not loaded');
+    console.log('Google accounts:', window.google?.accounts ? '✅ Available' : '❌ Not available');
+    console.log('Google ID:', window.google?.accounts?.id ? '✅ Ready' : '❌ Not ready');
+    console.log('Button container:', googleButtonRef.current ? '✅ Exists' : '❌ Missing');
+    console.log('Global callback:', window.handleGoogleCallback ? '✅ Set' : '❌ Not set');
+    
+    if (googleButtonRef.current) {
+      const iframe = googleButtonRef.current.querySelector('iframe');
+      console.log('Iframe:', iframe ? '✅ Found' : '❌ Not found');
       if (iframe) {
+        console.log('Iframe src:', iframe.src);
         console.log('Iframe computed style:', window.getComputedStyle(iframe));
-        console.log('Iframe pointer-events:', window.getComputedStyle(iframe).pointerEvents);
-        console.log('Iframe z-index:', window.getComputedStyle(iframe).zIndex);
       }
-      console.log('Buttons found:', buttons.length);
-      buttons.forEach((btn, index) => {
-        console.log(`Button ${index} computed style:`, window.getComputedStyle(btn as HTMLElement));
-      });
-      
-      // Check for overlapping elements
-      const rect = container.getBoundingClientRect();
-      const elementsAtPoint = document.elementsFromPoint(
-        rect.left + rect.width / 2,
-        rect.top + rect.height / 2
-      );
-      console.log('Elements at button center:', elementsAtPoint);
     }
+    console.groupEnd();
   };
 
   return (
@@ -441,7 +489,7 @@ const Auth = () => {
             </div>
 
             <button
-              onClick={triggerGoogleSignIn}
+              onClick={handleManualSignIn}
               disabled={loading}
               className={`w-full bg-white hover:bg-gray-50 text-gray-800 font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 border border-gray-300 shadow-lg hover:shadow-xl ${
                 loading ? 'opacity-50 cursor-not-allowed' : ''
@@ -469,16 +517,14 @@ const Auth = () => {
               )}
             </button>
 
-            {/* Debug button - Remove in production */}
-            {process.env.NODE_ENV === 'development' && (
-              <button
-                onClick={debugButton}
-                className="w-full text-xs text-muted-foreground hover:text-foreground mt-2"
-                type="button"
-              >
-                🔍 Debug: Check button status
-              </button>
-            )}
+            {/* Debug button */}
+            <button
+              onClick={debugGoogleSignIn}
+              className="w-full text-xs text-muted-foreground hover:text-foreground mt-2"
+              type="button"
+            >
+              🔍 Debug Info (Check Console)
+            </button>
           </div>
 
           {/* Footer */}
