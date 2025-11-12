@@ -465,65 +465,72 @@ app.get('/api/member-spaces', (req, res) => {
 // This allows the backend to serve the React app for SPA routing
 // CRITICAL: This is registered AFTER all API routes to ensure API routes are matched first
 
+// Only set up static file serving in production
 if (process.env.NODE_ENV === 'production') {
   const frontendDistPath = path.resolve(__dirname, '../dist');
+  const fs = require('fs'); // Use require for synchronous check
   
-  // Use dynamic import for fs to check if dist exists
-  import('fs').then((fs) => {
-    if (fs.existsSync(frontendDistPath)) {
-      console.log('📦 Serving frontend static files from:', frontendDistPath);
+  if (fs.existsSync(frontendDistPath)) {
+    console.log('📦 Serving frontend static files from:', frontendDistPath);
+    
+    // CRITICAL: Create static file handler ONCE (not on every request)
+    const staticHandler = express.static(frontendDistPath, {
+      index: false, // Don't auto-serve index.html
+    });
+    
+    // CRITICAL: Create a middleware that ONLY serves static files for NON-API routes
+    // We explicitly check the path BEFORE calling express.static()
+    // This middleware MUST be registered AFTER all API routes
+    app.use((req, res, next) => {
+      // CRITICAL: NEVER serve static files for API routes
+      // Check both the path and ensure we're not matching API routes
+      if (req.path.startsWith('/api/')) {
+        // This is an API route - skip static file serving completely
+        // DO NOT serve any static files for API routes
+        return next(); // Pass to API route handlers
+      }
       
-      // CRITICAL: Create static file handler ONCE (not on every request)
-      const staticHandler = express.static(frontendDistPath, {
-        index: false, // Don't auto-serve index.html
-      });
-      
-      // CRITICAL: Create a middleware that ONLY serves static files for NON-API routes
-      // We explicitly check the path BEFORE calling express.static()
-      app.use((req, res, next) => {
-        // CRITICAL: NEVER serve static files for API routes
-        // Check both the path and ensure we're not matching API routes
-        if (req.path.startsWith('/api/')) {
-          // This is an API route - skip static file serving completely
-          console.log('🚫 API route detected, skipping static file serving:', req.path);
-          return next(); // Pass to API route handlers
+      // This is NOT an API route - try to serve static file
+      staticHandler(req, res, (err) => {
+        // If static file not found (404), pass to next middleware (SPA routing)
+        if (err && err.status === 404) {
+          return next();
         }
-        
-        // This is NOT an API route - try to serve static file
-        staticHandler(req, res, (err) => {
-          // If static file not found (404), pass to next middleware (SPA routing)
-          if (err && err.status === 404) {
-            return next();
-          }
-          // If other error, pass it along
-          if (err) {
-            return next(err);
-          }
+        // If other error, pass it along
+        if (err) {
+          return next(err);
+        }
+      });
+    });
+    
+    // SPA routing: serve index.html for all non-API routes that don't match static files
+    // This must be the LAST route handler
+    // CRITICAL: Use app.all() to catch all methods, but only handle GET for SPA
+    app.all('*', (req, res, next) => {
+      // CRITICAL: Never serve index.html for API routes
+      if (req.path.startsWith('/api/')) {
+        console.error('❌ ERROR: API route caught by catch-all route:', req.method, req.path);
+        console.error('❌ This should never happen - API routes should be handled above');
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(404).json({ 
+          error: 'API endpoint not found', 
+          path: req.path,
+          method: req.method,
+          message: 'This API route was caught by the catch-all handler. Check route registration order.'
         });
-      });
+      }
       
-      // SPA routing: serve index.html for all non-API routes that don't match static files
-      // This must be the LAST route handler
-      app.get('*', (req, res) => {
-        // CRITICAL: Never serve index.html for API routes
-        if (req.path.startsWith('/api/')) {
-          console.error('❌ ERROR: API route caught by catch-all route:', req.path);
-          console.error('❌ This should never happen - API routes should be handled above');
-          return res.status(404).json({ 
-            error: 'API endpoint not found', 
-            path: req.path,
-            message: 'This API route was caught by the catch-all handler. Check route registration order.'
-          });
-        }
-        // Serve index.html for SPA routing (non-API routes only)
-        res.sendFile(path.join(frontendDistPath, 'index.html'));
-      });
-    } else {
-      console.log('⚠️ Frontend dist folder not found. Assuming frontend is served separately.');
-    }
-  }).catch((err) => {
-    console.log('⚠️ Could not check for frontend dist folder:', err.message);
-  });
+      // Only handle GET requests for SPA routing
+      if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+      }
+      
+      // Serve index.html for SPA routing (non-API routes only)
+      res.sendFile(path.join(frontendDistPath, 'index.html'));
+    });
+  } else {
+    console.log('⚠️ Frontend dist folder not found. Assuming frontend is served separately.');
+  }
 }
 
 // ============================================================================
