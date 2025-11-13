@@ -113,7 +113,14 @@ class ApiService {
         level_progress: 0
       },
       posts_count: 0,
-      comments_count: 0
+      comments_count: 0,
+      member_tags: [],
+      activity_score: {
+        activity_score: "0",
+        presence: "0",
+        participation: "0"
+      },
+      flattened_profile_fields: {}
     } as MemberData;
     
     /* DISABLED: Direct Circle API calls from frontend cause CORS errors
@@ -202,56 +209,8 @@ class ApiService {
 
   // Get member spaces (courses) from Circle.so
   async getMemberSpaces(memberId: string): Promise<MemberSpaces[]> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/member/spaces?memberId=${encodeURIComponent(memberId)}`, {
-        credentials: 'include' as RequestCredentials,
-      });
-      
-      // Check content-type before parsing
-      const contentType = response.headers.get('content-type');
-      const isJSON = contentType && contentType.includes('application/json');
-      
-      if (!response.ok) {
-        if (isJSON) {
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `Failed to fetch member spaces: ${response.statusText}`);
-          } catch (parseError) {
-            throw new Error(`Failed to fetch member spaces: ${response.statusText}`);
-          }
-        } else {
-          console.warn('⚠️ Spaces API returned non-JSON error response');
-          throw new Error(`API error: ${response.status} ${response.statusText}`);
-        }
-      }
-
-      if (!isJSON) {
-        console.warn('⚠️ Spaces response is not JSON, returning empty array');
-        return [];
-      }
-
-      const data = await response.json();
-      
-      // Handle different response formats:
-      // 1. If it's already an array, return it
-      // 2. If it's an object with 'records' property (Circle.so paginated response), return records
-      // 3. If it's an object with 'spaces' property, return spaces
-      // 4. Otherwise, return empty array
-      if (Array.isArray(data)) {
-        return data;
-      } else if (data && Array.isArray(data.records)) {
-        return data.records;
-      } else if (data && Array.isArray(data.spaces)) {
-        return data.spaces;
-      } else {
-        console.warn('⚠️ Unexpected spaces response format:', data);
-        return [];
-      }
-    } catch (error) {
-      console.error('❌ Error fetching member spaces:', error);
-      // Return empty array instead of throwing - spaces are optional
-      return [];
-    }
+    // Return empty array - no API calls
+    return [];
   }
 
   // Calculate user level and XP from Circle data

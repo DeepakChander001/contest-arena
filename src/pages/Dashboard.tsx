@@ -3,15 +3,13 @@ import { LevelProgress } from "@/components/LevelProgress";
 import { ContestCard } from "@/components/ContestCard";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, isLoading, refreshUserData } = useAuth();
+  const { user, isLoading } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [isLoadingData, setIsLoadingData] = useState(false);
 
   console.log('🏠 Dashboard component loaded');
   console.log('🏠 User:', user);
@@ -20,124 +18,12 @@ const Dashboard = () => {
   // Generate mock monthly XP data for chart (would come from real data)
   const monthlyXP = [120, 230, 180, 290, 310, 260, 340];
 
-  useEffect(() => {
-    // Refresh user data when component mounts
-    if (user) {
-      refreshUserData();
-    }
-  }, []);
-
-  // Add session refresh function like in DailyRewards
-  const refreshSession = async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com'}/api/refresh-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          userData: {
-            id: user?.id,
-            email: user?.email,
-            name: user?.name,
-            googleId: user?.id,
-            googleName: user?.name,
-            avatarUrl: user?.avatarUrl
-          }
-        })
-      });
-
-      if (response.ok) {
-        console.log('✅ Dashboard session refreshed successfully');
-        return true;
-      } else {
-        console.error('❌ Failed to refresh dashboard session');
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Error refreshing dashboard session:', error);
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    // Refresh session when dashboard loads
-    if (user) {
-      refreshSession();
-    }
-  }, [user]);
-
-  // Fetch dashboard data from API
-  const fetchDashboardData = async () => {
-    try {
-      setIsLoadingData(true);
-      
-      // First refresh the session
-      await refreshSession();
-      
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
-      const response = await fetch(`${apiUrl}/api/dashboard`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDashboardData(data);
-        console.log('✅ Dashboard data loaded:', data);
-      } else {
-        const errorText = await response.text();
-        console.error('❌ Failed to fetch dashboard data:', response.status, response.statusText);
-        console.error('❌ Error details:', errorText);
-        
-        // If 404, the endpoint might not exist - use mock data as fallback
-        if (response.status === 404) {
-          console.warn('⚠️ Dashboard endpoint not found, using fallback data');
-          setDashboardData({
-            user: {
-              name: user?.name || 'User',
-              email: user?.email || '',
-              avatarUrl: user?.avatarUrl || null,
-              currentXP: user?.currentXP || 0,
-              level: user?.level || 1,
-              nextLevelXP: user?.nextLevelXP || 1000,
-              streak: user?.streak || 0,
-              totalContests: 0,
-              winRate: 0
-            },
-            contests: [],
-            stats: {
-              monthlyXP: [],
-              recentActivity: []
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error);
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
-
-  useEffect(() => {
-    // Fetch dashboard data when user is available
-    if (user) {
-      fetchDashboardData();
-    }
-  }, [user]);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    try {
-      await refreshUserData();
-      await fetchDashboardData();
-    } finally {
-      setIsRefreshing(false);
-    }
+    // Just reload the page for now
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
   };
 
   // Show loading state - Wait for AuthContext to finish loading
@@ -183,26 +69,8 @@ const Dashboard = () => {
     );
   }
 
-  // Add a simple test to make sure the component renders
-  console.log('🏠 Dashboard rendering with user:', user);
-  console.log('🏠 Dashboard data:', dashboardData);
-  console.log('🏠 IsLoadingData:', isLoadingData);
-
-  // Show loading state for dashboard data
-  if (isLoadingData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Loading dashboard data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Use dashboard data if available, otherwise use user data as fallback
-  const displayUser = dashboardData?.user || user;
-  const displayContests = dashboardData?.contests || [];
+  // Use user data directly
+  const displayUser = user;
 
   const activeContests = [
     {
@@ -368,7 +236,7 @@ const Dashboard = () => {
             </Button>
           </div>
           <div className="space-y-6">
-            {(displayContests.length > 0 ? displayContests : activeContests).map((contest, index) => (
+            {activeContests.map((contest, index) => (
               <div
                 key={contest.id}
                 className="transform hover:-translate-y-1 transition-all duration-300 hover:shadow-xl"
