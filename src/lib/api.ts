@@ -79,7 +79,7 @@ class ApiService {
 
   // Verify member with Circle.so
   async verifyMember(email: string): Promise<VerifyMemberResponse> {
-    const response = await fetch(`${this.baseUrl}/api/verify-member`, {
+    const response = await fetch(`${this.baseUrl}/verify-member`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
