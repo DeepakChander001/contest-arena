@@ -70,7 +70,7 @@ class ApiService {
 
   // Health check
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
-    const response = await fetch(`${this.baseUrl}/api/health`);
+    const response = await fetch(`${this.baseUrl}/health`);
     if (!response.ok) {
       throw new Error('Health check failed');
     }
