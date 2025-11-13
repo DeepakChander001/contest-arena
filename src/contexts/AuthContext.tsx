@@ -100,6 +100,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadUserFromStorage = async () => {
       try {
+        const storedUser = localStorage.getItem('10x-contest-user');
+        
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            console.log('📦 Loading user from localStorage:', userData.email);
+            setUser(userData);
+          } catch (parseError) {
+            console.error('❌ Error parsing stored user data:', parseError);
+            localStorage.removeItem('10x-contest-user');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user from storage:', error);
+        localStorage.removeItem('10x-contest-user');
+      } finally {
+        // CRITICAL: Always set loading to false
+        setIsLoading(false);
+      }
+    };
+
+    loadUserFromStorage();
+  }, []);
+
+  // OLD CODE - DISABLED: Complex OAuth callback handling moved to Auth.tsx
+  /* useEffect(() => {
+    const loadUserFromStorage = async () => {
+      try {
         // Check for OAuth callback parameters
         const urlParams = new URLSearchParams(window.location.search);
         const success = urlParams.get('success');
@@ -275,7 +303,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     loadUserFromStorage();
-  }, []);
+  }, []); */
 
   const login = async (email: string): Promise<{ success: boolean; message: string }> => {
     try {

@@ -95,6 +95,28 @@ class ApiService {
 
   // Get member data from Circle.so (primary source) or database (fallback)
   async getMemberData(email?: string): Promise<MemberData> {
+    // Return mock data for now to prevent CORS errors
+    console.log('⚠️ Returning mock data - Circle API should be called from backend');
+    return {
+      id: 1,
+      email: email || 'user@example.com',
+      name: 'User',
+      first_name: 'User',
+      last_name: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+      gamification_stats: {
+        current_level: 1,
+        total_points: 0,
+        points_to_next_level: 1000,
+        level_progress: 0
+      },
+      posts_count: 0,
+      comments_count: 0
+    } as MemberData;
+    
+    /* DISABLED: Direct Circle API calls from frontend cause CORS errors
     // Always try Circle API first - this is the source of truth
     const circleUrl = email
       ? `${this.baseUrl}/api/member?email=${encodeURIComponent(email)}`

@@ -31,17 +31,13 @@ const Auth = () => {
       return;
     }
 
-    // Ignore COOP warnings - they don't affect functionality
-    if (response.error && !response.error.includes('FedCM')) {
+    if (response.error) {
       setMessage({ type: 'error', text: `Sign-in failed: ${response.error}` });
-      setLoading(false);
       return;
     }
 
     if (!response.credential) {
-      console.error('❌ No credential in response');
-      setMessage({ type: 'error', text: 'No credential received from Google' });
-      setLoading(false);
+      setMessage({ type: 'error', text: 'No credential received' });
       return;
     }
 
@@ -62,30 +58,42 @@ const Auth = () => {
       const userInfo = JSON.parse(jsonPayload);
       console.log('✅ User authenticated:', userInfo.email);
 
-      // Save basic user data first
-      const userData = {
+      // Create complete user object for context
+      const fullUser = {
+        id: userInfo.sub,
         email: userInfo.email,
         name: userInfo.name,
-        picture: userInfo.picture,
-        sub: userInfo.sub,
-        email_verified: userInfo.email_verified,
-        loginTime: new Date().toISOString()
+        avatarUrl: userInfo.picture,
+        googleId: userInfo.sub,
+        level: 1,
+        currentXP: 0,
+        currentLevelXP: 0,
+        nextLevelXP: 1000,
+        progressPct: 0,
+        badges: [],
+        postsCount: 0,
+        commentsCount: 0,
+        activityScore: "0",
+        bio: null,
+        profileFields: {},
+        completedLessons: 0,
+        totalLessons: 0,
+        streak: 0,
+        spaces: []
       };
 
-      localStorage.setItem('user', JSON.stringify(userData));
+      // Save to localStorage with the correct key
+      localStorage.setItem('10x-contest-user', JSON.stringify(fullUser));
       localStorage.setItem('google_credential', credential);
 
-      console.log('✅ User data saved locally');
-      console.log('✅ Sign-in complete, redirecting to dashboard...');
+      console.log('✅ Sign-in complete, redirecting...');
       
-      // Redirect to dashboard
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 500);
+      // Force page reload to ensure context picks up new user
+      window.location.href = '/dashboard';
       
     } catch (err: any) {
-      console.error('❌ Error processing sign-in:', err);
-      setMessage({ type: 'error', text: err.message || 'Failed to complete sign-in. Please try again.' });
+      console.error('❌ Error:', err);
+      setMessage({ type: 'error', text: 'Failed to complete sign-in' });
       setLoading(false);
     }
   }, []);
@@ -100,13 +108,6 @@ const Auth = () => {
     };
   }, [handleGoogleCallback]);
 
-  // Check if already authenticated
-  useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      navigate('/dashboard');
-    }
-  }, [navigate]);
 
   // CRITICAL: Add global styles to ensure button is clickable
   useEffect(() => {
