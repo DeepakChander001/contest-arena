@@ -111,8 +111,11 @@ app.post('/api/auth/logout', logout);
 app.post('/api/auth/complete', async (req, res) => {
   try {
     // Import and use the handler from the separate file
+    // Convert Express req/res to Vercel format
+    const vercelReq = req as any;
+    const vercelRes = res as any;
     const completeHandler = (await import('./auth/complete.js')).default;
-    return completeHandler(req, res);
+    return completeHandler(vercelReq, vercelRes);
   } catch (error: any) {
     console.error('Error in auth/complete:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
@@ -131,8 +134,11 @@ app.get('/api/user', (req, res) => {
 app.get('/api/user/profile', async (req, res) => {
   try {
     // Import and use the handler from the separate file
+    // Convert Express req/res to Vercel format
+    const vercelReq = req as any;
+    const vercelRes = res as any;
     const profileHandler = (await import('./user/profile.js')).default;
-    return profileHandler(req, res);
+    return profileHandler(vercelReq, vercelRes);
   } catch (error: any) {
     console.error('Error in user/profile:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
