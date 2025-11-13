@@ -16,7 +16,6 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [buttonReady, setButtonReady] = useState(false);
   
-  const { isAuthenticated, user, handleGoogleLogin: handleAuthLogin } = useAuth();
   const navigate = useNavigate();
   
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -32,12 +31,9 @@ const Auth = () => {
       return;
     }
 
-    if (response.error) {
-      console.error('❌ Google Sign-In error:', response.error);
-      // Don't show error for FedCM issues
-      if (!response.error.includes('FedCM')) {
-        setMessage({ type: 'error', text: `Sign-in failed: ${response.error}` });
-      }
+    // Ignore COOP warnings - they don't affect functionality
+    if (response.error && !response.error.includes('FedCM')) {
+      setMessage({ type: 'error', text: `Sign-in failed: ${response.error}` });
       setLoading(false);
       return;
     }
@@ -80,46 +76,19 @@ const Auth = () => {
       localStorage.setItem('google_credential', credential);
 
       console.log('✅ User data saved locally');
-
-      // Map to format expected by AuthContext
-      const googleUserData = {
-        email: userInfo.email,
-        name: userInfo.name,
-        picture: userInfo.picture,
-        sub: userInfo.sub,
-      };
-
-      // Try to process login with Circle data via AuthContext (with graceful fallback)
-      try {
-        await handleAuthLogin(googleUserData);
-        // If successful, redirect will happen in handleAuthLogin
-        console.log('✅ Login processed successfully');
-      } catch (circleError: any) {
-        console.warn('⚠️ Circle API error, continuing with basic Google data:', circleError);
-        
-        // Check if it's a "not found" error - redirect to profile creation
-        if (circleError?.message?.includes('not found') || 
-            circleError?.message?.includes('404') || 
-            circleError?.notFound) {
-          console.log('⚠️ User not found in Circle, redirecting to profile creation');
-          window.location.href = `/create-profile?email=${encodeURIComponent(userInfo.email)}&name=${encodeURIComponent(userInfo.name || '')}`;
-          return;
-        }
-        
-        // For other errors (like HTML responses), continue with basic data
-        console.log('⚠️ Circle API returned error, using basic Google data');
-        // User data already saved, just redirect to dashboard
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 500);
-      }
+      console.log('✅ Sign-in complete, redirecting to dashboard...');
+      
+      // Redirect to dashboard
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 500);
       
     } catch (err: any) {
       console.error('❌ Error processing sign-in:', err);
       setMessage({ type: 'error', text: err.message || 'Failed to complete sign-in. Please try again.' });
       setLoading(false);
     }
-  }, [handleAuthLogin]);
+  }, []);
 
   // Make callback available globally so Google's iframe can call it
   useEffect(() => {
@@ -133,11 +102,11 @@ const Auth = () => {
 
   // Check if already authenticated
   useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log('✅ User already authenticated, redirecting to dashboard');
-      navigate('/dashboard', { replace: true });
+    const user = localStorage.getItem('user');
+    if (user) {
+      navigate('/dashboard');
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [navigate]);
 
   // CRITICAL: Add global styles to ensure button is clickable
   useEffect(() => {
