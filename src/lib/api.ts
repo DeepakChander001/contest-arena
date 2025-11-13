@@ -197,6 +197,7 @@ class ApiService {
       // Re-throw the original error
       throw error;
     }
+    */
   }
 
   // Get member spaces (courses) from Circle.so
