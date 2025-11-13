@@ -58,6 +58,9 @@ export const updateUserProfile = async (req: Request, res: Response) => {
     console.log('🔍 Session data:', req.session);
     console.log('🔍 Session user:', req.session?.user);
 
+    // Prepare Supabase client once for entire handler
+    const supabase = getSupabaseClient();
+
     // Check if user is authenticated - try multiple session structures
     let userEmail = null;
     
@@ -65,7 +68,7 @@ export const updateUserProfile = async (req: Request, res: Response) => {
       userEmail = req.session.user.email;
     } else if (req.session?.user?.googleEmail) {
       userEmail = req.session.user.googleEmail;
-    } else if (req.session?.user?.id) {
+    } else if (req.session?.user?.id && supabase) {
       // If we only have user ID, we need to get email from database
       console.log('🔍 Found user ID in session, fetching email from database...');
       const { data: userProfile } = await supabase
@@ -77,6 +80,8 @@ export const updateUserProfile = async (req: Request, res: Response) => {
       if (userProfile?.email) {
         userEmail = userProfile.email;
       }
+    } else if (req.session?.user?.id && !supabase) {
+      console.warn('⚠️ Supabase client not available, cannot resolve user email from ID');
     }
 
     // Fallback: use email from form data if session doesn't have it
@@ -94,9 +99,6 @@ export const updateUserProfile = async (req: Request, res: Response) => {
     }
 
     console.log('📧 Updating profile for:', userEmail);
-
-    // Get Supabase client
-    const supabase = getSupabaseClient();
 
     // Check if Supabase is available
     if (!supabase) {
