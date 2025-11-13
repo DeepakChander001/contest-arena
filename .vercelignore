@@ -1,0 +1,9 @@
+# Exclude backend from Vercel build
+backend/
+backend/**
+api/
+*.md
+.env
+.env.local
+.env.*.local
+
