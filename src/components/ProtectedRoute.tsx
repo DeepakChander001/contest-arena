@@ -29,17 +29,3 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   return <>{children}</>;
 }
 
-
-        </div>
-      </div>
-    );
-  }
-  
-  // Only check authentication AFTER loading is complete
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  return <>{children}</>;
-}
-
