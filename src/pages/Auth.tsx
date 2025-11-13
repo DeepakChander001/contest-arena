@@ -13,6 +13,7 @@ const Auth = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [buttonReady, setButtonReady] = useState(false);
+  const [scriptLoadAttempts, setScriptLoadAttempts] = useState(0);
   
   const navigate = useNavigate();
   
@@ -156,84 +157,117 @@ const Auth = () => {
     };
   }, []);
 
-  // Load and initialize Google Sign-In with complete DOM isolation using useRef
+  // IMPROVED Google Script Loading with retry logic
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
       setMessage({ type: 'error', text: 'Google Client ID not configured' });
       return;
     }
 
-    let isMounted = true;
-    let initAttempts = 0;
-    const maxAttempts = 10;
+    let mounted = true;
 
     const loadGoogleScript = () => {
-      // Check if script already exists
-      const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-      
-      if (existingScript) {
-        console.log('📜 Google script already loaded');
-        waitForGoogle();
+      // Check if already loaded
+      if (window.google?.accounts?.id) {
+        console.log('✅ Google already loaded');
+        initializeGoogleSignIn();
         return;
       }
 
-      console.log('📥 Loading Google Identity Services script...');
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
+      // Check if script tag exists
+      let script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement;
       
-      script.onload = () => {
-        console.log('✅ Script loaded successfully');
-        if (isMounted) {
-          waitForGoogle();
-        }
-      };
+      if (!script) {
+        console.log('📥 Creating Google script tag...');
+        script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = false; // Changed to false for immediate loading
+        script.id = 'google-signin-script';
+        
+        // Add multiple event handlers
+        script.onload = () => {
+          console.log('✅ Script tag loaded');
+          if (typeof window !== 'undefined') {
+            (window as any).gsiScriptLoaded = true;
+          }
+          // Wait a bit for Google object to initialize
+          setTimeout(() => {
+            if (mounted) checkGoogleObject();
+          }, 100);
+        };
 
-      script.onerror = (err) => {
-        console.error('❌ Failed to load script:', err);
-        if (isMounted) {
-          setMessage({ type: 'error', text: 'Failed to load Google Sign-In script' });
-        }
-      };
+        script.onerror = (error) => {
+          console.error('❌ Script loading error:', error);
+          if (mounted && scriptLoadAttempts < 3) {
+            const currentAttempts = scriptLoadAttempts + 1;
+            console.log(`🔄 Retrying script load (attempt ${currentAttempts}/3)...`);
+            // Remove failed script and retry
+            script.remove();
+            setTimeout(() => {
+              if (mounted) {
+                setScriptLoadAttempts(currentAttempts);
+                loadGoogleScript();
+              }
+            }, 2000);
+          } else {
+            setMessage({ type: 'error', text: 'Failed to load Google Sign-In. Please refresh the page.' });
+          }
+        };
 
-      document.head.appendChild(script);
+        // Add to head instead of body
+        document.head.appendChild(script);
+      } else {
+        console.log('📜 Script tag exists, checking Google object...');
+        checkGoogleObject();
+      }
     };
 
-    const waitForGoogle = () => {
+    const checkGoogleObject = () => {
+      let checkAttempts = 0;
+      const maxChecks = 20; // Increased from 10
+
       const checkInterval = setInterval(() => {
-        initAttempts++;
-        
-        if (window.google?.accounts?.id && isMounted) {
+        checkAttempts++;
+        console.log(`🔍 Checking for Google object (${checkAttempts}/${maxChecks})...`);
+
+        if (window.google?.accounts?.id) {
           clearInterval(checkInterval);
-          console.log('✅ Google object ready');
-          initializeGoogleSignIn();
-        } else if (initAttempts >= maxAttempts) {
-          clearInterval(checkInterval);
-          console.error('❌ Google object not available after retries');
-          if (isMounted) {
-            setMessage({ type: 'error', text: 'Google Sign-In took too long to load' });
+          console.log('✅ Google object found!');
+          if (mounted) {
+            initializeGoogleSignIn();
           }
-        } else {
-          console.log(`⏳ Waiting for Google object... (${initAttempts}/${maxAttempts})`);
+        } else if (checkAttempts >= maxChecks) {
+          clearInterval(checkInterval);
+          console.error('❌ Google object not available after maximum attempts');
+          
+          // Try one more time with a fresh script load
+          if (mounted && scriptLoadAttempts < 3) {
+            const currentAttempts = scriptLoadAttempts + 1;
+            console.log('🔄 Attempting fresh script reload...');
+            const oldScript = document.getElementById('google-signin-script');
+            if (oldScript) oldScript.remove();
+            if (typeof window !== 'undefined') {
+              (window as any).gsiScriptLoaded = false;
+            }
+            setTimeout(() => {
+              if (mounted) {
+                setScriptLoadAttempts(currentAttempts);
+                loadGoogleScript();
+              }
+            }, 1000);
+          } else {
+            setMessage({ type: 'error', text: 'Google Sign-In is not loading. Please try refreshing the page or use a different browser.' });
+          }
         }
       }, 500);
     };
 
-    let attempts = 0;
-
     const initializeGoogleSignIn = () => {
-      if (!window.google?.accounts?.id) {
-        attempts++;
-        if (attempts < 10 && isMounted) {
-          setTimeout(initializeGoogleSignIn, 500);
-        } else if (isMounted) {
-          setMessage({ type: 'error', text: 'Google Sign-In failed to load. Please refresh the page.' });
-        }
+      if (!googleButtonRef.current || !mounted) {
+        console.log('❌ Button ref not ready');
         return;
       }
-
-      if (!googleButtonRef.current || !isMounted) return;
 
       try {
         console.log('🔧 Initializing Google Sign-In...');
@@ -271,7 +305,7 @@ const Auth = () => {
         );
 
         setButtonReady(true);
-        console.log('✅ Google Sign-In ready (FedCM disabled)');
+        console.log('✅ Google Sign-In button rendered successfully!');
 
         // Optional: Enable One Tap
         window.google.accounts.id.prompt((notification: any) => {
@@ -300,22 +334,32 @@ const Auth = () => {
           }
         }, 1000);
         
-      } catch (err) {
-        console.error('❌ Failed to initialize Google Sign-In:', err);
-        if (isMounted) {
-          setMessage({ type: 'error', text: 'Failed to initialize Google Sign-In' });
-        }
-      }
-    };
+       } catch (err) {
+         console.error('❌ Initialization error:', err);
+         if (mounted) {
+           setMessage({ type: 'error', text: 'Failed to initialize Google Sign-In. Please refresh and try again.' });
+         }
+       }
+     };
 
-    // Start loading
+    // Start the loading process
+    console.log('🚀 Starting Google Sign-In setup...');
     loadGoogleScript();
 
     // Cleanup
     return () => {
-      isMounted = false;
+      mounted = false;
     };
-  }, [GOOGLE_CLIENT_ID]);
+  }, [GOOGLE_CLIENT_ID, scriptLoadAttempts]);
+
+  // Fallback: Manual reload button
+  const handleManualReload = () => {
+    console.log('🔄 Manual reload triggered');
+    setMessage(null);
+    setScriptLoadAttempts(0);
+    // Force reload the page
+    window.location.reload();
+  };
 
   // Manual OAuth redirect fallback
   const handleManualSignIn = () => {
@@ -432,12 +476,20 @@ const Auth = () => {
                   <AlertCircle className="w-4 h-4" />
                 )}
                 <span className="flex-1">{message.text}</span>
-                <button 
-                  onClick={() => setMessage(null)} 
-                  className="text-xs underline ml-2"
-                >
-                  Dismiss
-                </button>
+                 <div className="flex gap-2 mt-2">
+                   <button 
+                     onClick={() => setMessage(null)} 
+                     className="text-xs underline hover:opacity-80"
+                   >
+                     Dismiss
+                   </button>
+                   <button 
+                     onClick={handleManualReload}
+                     className="text-xs underline hover:opacity-80"
+                   >
+                     Reload Page
+                   </button>
+                 </div>
               </div>
             )}
 
@@ -463,12 +515,29 @@ const Auth = () => {
               }}
             />
 
-            {/* Show loading message outside the button container */}
-            {!buttonReady && !message && (
-              <div className="text-center text-muted-foreground text-sm animate-pulse mt-2">
-                Loading Google Sign-In...
-              </div>
-            )}
+             {/* Show loading message outside the button container */}
+             {!buttonReady && !message && (
+               <div className="text-center">
+                 <div className="text-muted-foreground text-sm animate-pulse mb-2">
+                   Loading Google Sign-In...
+                 </div>
+                 {scriptLoadAttempts > 0 && (
+                   <div className="text-xs text-muted-foreground">
+                     Retry attempt {scriptLoadAttempts}/3
+                   </div>
+                 )}
+               </div>
+             )}
+
+             {/* Fallback button if script fails to load */}
+             {message && message.type === 'error' && (
+               <button
+                 onClick={handleManualReload}
+                 className="w-full px-4 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-all"
+               >
+                 Reload and Try Again
+               </button>
+             )}
 
             {/* Manual trigger button - Always available as fallback */}
             <div className="relative">
