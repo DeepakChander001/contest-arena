@@ -64,7 +64,8 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = API_BASE_URL;
+    // Use relative path for Vercel functions
+    this.baseUrl = '/api';
   }
 
   // Health check
@@ -95,116 +96,59 @@ class ApiService {
 
   // Get member data from Circle.so (primary source) or database (fallback)
   async getMemberData(email?: string): Promise<MemberData> {
-    // Return mock data for now to prevent CORS errors
-    console.log('⚠️ Returning mock data - Circle API should be called from backend');
-    return {
-      id: 1,
-      email: email || 'user@example.com',
-      name: 'User',
-      first_name: 'User',
-      last_name: '',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      last_seen_at: new Date().toISOString(),
-      gamification_stats: {
-        current_level: 1,
-        total_points: 0,
-        points_to_next_level: 1000,
-        level_progress: 0
-      },
-      posts_count: 0,
-      comments_count: 0,
-      member_tags: [],
-      activity_score: {
-        activity_score: "0",
-        presence: "0",
-        participation: "0"
-      },
-      flattened_profile_fields: {}
-    } as MemberData;
-    
-    /* DISABLED: Direct Circle API calls from frontend cause CORS errors
-    // Always try Circle API first - this is the source of truth
-    const circleUrl = email
-      ? `${this.baseUrl}/api/member?email=${encodeURIComponent(email)}`
-      : `${this.baseUrl}/api/member`;
-    
+    if (!email) {
+      throw new Error('Email is required to fetch member data');
+    }
+
     try {
-      const response = await fetch(circleUrl, { credentials: 'include' as RequestCredentials });
+      const response = await fetch(`${this.baseUrl}/user/profile?email=${encodeURIComponent(email)}`);
       
-      // Check content-type before parsing
-      const contentType = response.headers.get('content-type');
-      const isJSON = contentType && contentType.includes('application/json');
-      
-      if (response.ok) {
-        if (!isJSON) {
-          console.warn('⚠️ Response is not JSON, content-type:', contentType);
-          throw new Error('API returned non-JSON response');
+      if (!response.ok) {
+        if (response.status === 404) {
+          const error: any = new Error('Member not found');
+          error.notFound = true;
+          throw error;
         }
-        const data = await response.json();
-        console.log('✅ User data fetched from Circle API');
-        return data;
+        throw new Error(`Failed to fetch member data: ${response.statusText}`);
       }
+
+      const userData = await response.json();
       
-      // If 404, user not found in Circle
-      if (response.status === 404) {
-        // Try to parse error message, but handle HTML responses
-        let errorData: any = {};
-        if (isJSON) {
-          try {
-            errorData = await response.json();
-          } catch (e) {
-            console.warn('⚠️ Could not parse 404 response as JSON');
-          }
-        } else {
-          // If HTML response, just mark as not found
-          console.warn('⚠️ 404 response is HTML, not JSON');
-        }
-        const error: any = new Error(errorData.message || 'Member not found in Circle');
-        error.notFound = true;
-        throw error;
-      }
-      
-      // For other errors, check if response is JSON
-      if (isJSON) {
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.message || `Failed to fetch member data: ${response.statusText}`);
-        } catch (parseError) {
-          throw new Error(`Failed to fetch member data: ${response.statusText}`);
-        }
-      } else {
-        // HTML error page or other non-JSON response
-        console.warn('⚠️ API returned non-JSON error response');
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
+      // Transform the response to match MemberData interface
+      return {
+        id: parseInt(userData.id) || 1,
+        email: userData.email,
+        name: userData.name,
+        first_name: userData.name?.split(' ')[0] || '',
+        last_name: userData.name?.split(' ').slice(1).join(' ') || '',
+        avatar_url: userData.avatarUrl,
+        bio: userData.bio || null,
+        created_at: userData.createdAt || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_seen_at: userData.lastSeenAt || new Date().toISOString(),
+        gamification_stats: {
+          current_level: userData.level || 1,
+          total_points: userData.currentXP || 0,
+          points_to_next_level: userData.nextLevelXP || 1000,
+          level_progress: (userData.progressPct || 0) / 100
+        },
+        posts_count: userData.postsCount || 0,
+        comments_count: userData.commentsCount || 0,
+        member_tags: (userData.badges || []).map((badge: any) => ({
+          id: badge.id,
+          name: badge.name
+        })),
+        activity_score: {
+          activity_score: userData.activityScore || "0",
+          presence: "0",
+          participation: "0"
+        },
+        flattened_profile_fields: userData.profileFields || {}
+      } as MemberData;
     } catch (error: any) {
-      // If Circle API fails, try database as fallback
-      if (!error.notFound) {
-        try {
-          const dbUrl = email
-            ? `${this.baseUrl}/api/user?email=${encodeURIComponent(email)}`
-            : `${this.baseUrl}/api/user`;
-          const dbResponse = await fetch(dbUrl, { credentials: 'include' as RequestCredentials });
-          
-          if (dbResponse.ok) {
-            const contentType = dbResponse.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              console.log('✅ User data fetched from database (fallback)');
-              return dbResponse.json();
-            } else {
-              console.warn('⚠️ Database response is not JSON');
-            }
-          }
-        } catch (dbError) {
-          console.log('⚠️ Database fetch also failed');
-        }
-      }
-      
-      // Re-throw the original error
+      console.error('Error fetching member data:', error);
       throw error;
     }
-    */
   }
 
   // Get member spaces (courses) from Circle.so

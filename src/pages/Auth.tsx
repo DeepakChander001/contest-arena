@@ -45,55 +45,40 @@ const Auth = () => {
     setMessage(null);
 
     try {
-      // Decode JWT token
-      const credential = response.credential;
-      const base64Url = credential.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64).split('').map((c) => {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join('')
-      );
+      // Call backend to process Circle data and save to Supabase
+      const authResponse = await fetch('/api/auth/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          credential: response.credential
+        })
+      });
+
+      if (!authResponse.ok) {
+        const error = await authResponse.json();
+        throw new Error(error.error || 'Authentication failed');
+      }
+
+      const { user } = await authResponse.json();
       
-      const userInfo = JSON.parse(jsonPayload);
-      console.log('✅ User authenticated:', userInfo.email);
-
-      // Create complete user object for context
-      const fullUser = {
-        id: userInfo.sub,
-        email: userInfo.email,
-        name: userInfo.name,
-        avatarUrl: userInfo.picture,
-        googleId: userInfo.sub,
-        level: 1,
-        currentXP: 0,
-        currentLevelXP: 0,
-        nextLevelXP: 1000,
-        progressPct: 0,
-        badges: [],
-        postsCount: 0,
-        commentsCount: 0,
-        activityScore: "0",
-        bio: null,
-        profileFields: {},
-        completedLessons: 0,
-        totalLessons: 0,
-        streak: 0,
-        spaces: []
-      };
-
-      // Save to localStorage with the correct key
-      localStorage.setItem('10x-contest-user', JSON.stringify(fullUser));
-      localStorage.setItem('google_credential', credential);
-
+      // Save complete user data from Circle/Supabase
+      localStorage.setItem('10x-contest-user', JSON.stringify(user));
+      
       console.log('✅ Sign-in complete, redirecting...');
       
-      // Force page reload to ensure context picks up new user
+      // Redirect to dashboard
       window.location.href = '/dashboard';
       
     } catch (err: any) {
       console.error('❌ Error:', err);
-      setMessage({ type: 'error', text: 'Failed to complete sign-in' });
+      setMessage({ 
+        type: 'error', 
+        text: err.message.includes('Circle') || err.message.includes('Not a Circle member')
+          ? 'You must be a Circle member to access this platform' 
+          : 'Failed to complete sign-in'
+      });
       setLoading(false);
     }
   }, []);
