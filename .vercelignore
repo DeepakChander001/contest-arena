@@ -1,8 +1,15 @@
-# Exclude backend from Vercel build
-backend/
-backend/**
-api/
-*.md
+# Files to exclude from Vercel deployments
+
+# Build artifacts
+dist/
+backend/node_modules/
+node_modules/
+bun.lockb
+
+# Logs
+*.log
+
+# Environment files
 .env
 .env.local
 .env.*.local
