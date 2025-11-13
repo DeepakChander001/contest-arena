@@ -107,12 +107,36 @@ app.get('/api/auth/google/callback', handleGoogleCallback);
 app.get('/api/auth/user', getCurrentUser);
 app.post('/api/auth/logout', logout);
 
+// New Circle-Supabase integration endpoint
+app.post('/api/auth/complete', async (req, res) => {
+  try {
+    // Import and use the handler from the separate file
+    const completeHandler = (await import('./auth/complete.js')).default;
+    return completeHandler(req, res);
+  } catch (error: any) {
+    console.error('Error in auth/complete:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 // Get user data from database
 app.get('/api/user', (req, res) => {
   if (!req.query.email && (req as any).session?.user?.email) {
     (req as any).query.email = (req as any).session.user.email;
   }
   return getUserFromDbHandler(req as any, res as any);
+});
+
+// New Circle-Supabase integration endpoint for user profile
+app.get('/api/user/profile', async (req, res) => {
+  try {
+    // Import and use the handler from the separate file
+    const profileHandler = (await import('./user/profile.js')).default;
+    return profileHandler(req, res);
+  } catch (error: any) {
+    console.error('Error in user/profile:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
 });
 
 // Member data endpoints
