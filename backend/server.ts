@@ -25,8 +25,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables from parent directory
-dotenv.config({ path: path.resolve(__dirname, '.env') });
-dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+// When compiled, dist/server.js needs to look in ../backend/ for .env
+// This works both in dev (backend/.env) and prod (backend/dist/../.env = backend/.env)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
