@@ -122,7 +122,7 @@ const Landing = () => {
             />
           ))}
         </div>
-
+        
         <div className="container max-w-7xl relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Side - Hero Content - IMMEDIATELY VISIBLE */}
@@ -605,8 +605,8 @@ const Landing = () => {
             <p className="text-xl max-w-2xl mx-auto mb-8" style={{ color: '#E0E0E0' }}>
               Start competing, earning badges, and winning rewards. It takes just 10 seconds to get started.
             </p>
-          </div>
-          
+              </div>
+              
           <div className="space-y-6 scroll-reveal">
             {isAuthenticated ? (
               <Link 
@@ -644,8 +644,8 @@ const Landing = () => {
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-success" />
                 <span>Real Rewards</span>
-              </div>
-            </div>
+          </div>
+        </div>
           </div>
         </div>
       </section>
@@ -664,7 +664,7 @@ const Landing = () => {
                   className="w-10 h-10 object-contain"
                 />
                 <h3 className="text-xl font-bold gradient-text">1to10x Contest Arena</h3>
-              </div>
+                </div>
               <p className="text-sm mb-4" style={{ color: '#C0C0C0' }}>
                 Where skills meet rewards. Compete, level up, and win real opportunities.
               </p>
@@ -705,7 +705,7 @@ const Landing = () => {
                   </Link>
                 </li>
               </ul>
-            </div>
+              </div>
             
             <div>
               <h4 className="font-semibold mb-4 gradient-text" style={{ color: '#FFFFFF' }}>Support</h4>

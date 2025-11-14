@@ -158,20 +158,20 @@ const Leaderboard = () => {
               {/* Your Position Card - PREMIUM ENHANCEMENT */}
               {leaderboardData?.currentUserPosition && (
                 <div className="glass-card-premium p-6 bg-gradient-to-r from-primary/10 to-transparent border-primary/20 mb-6 hover-glow card-shimmer">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div>
                         <div className="text-5xl font-bold font-mono text-primary">
                           #{leaderboardData.currentUserPosition.rank}
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
                           Your {getFilterLabel(activeFilter)} Rank
                         </div>
-                      </div>
-                      <div className="h-16 w-px bg-border" />
+            </div>
+            <div className="h-16 w-px bg-border" />
                       {leaderboardData.currentUserPosition.gapToNext !== null && 
                        leaderboardData.currentUserPosition.nextUser && (
-                        <div>
+            <div>
                           <div className="text-sm text-muted-foreground mb-1">
                             Gap to #{leaderboardData.currentUserPosition.rank - 1}
                           </div>
@@ -180,70 +180,70 @@ const Leaderboard = () => {
                           </div>
                           <div className="text-xs text-muted-foreground">
                             @{leaderboardData.currentUserPosition.nextUser.username}
-                          </div>
+            </div>
                         </div>
                       )}
-                    </div>
-                    <div className="text-right">
-                      <div className="flex items-center gap-2 justify-end mb-1">
-                        <Trophy className="w-5 h-5 text-primary" />
+          </div>
+          <div className="text-right">
+            <div className="flex items-center gap-2 justify-end mb-1">
+              <Trophy className="w-5 h-5 text-primary" />
                         <span className="text-lg font-semibold">
                           Top {100 - leaderboardData.currentUserPosition.percentile}%
                         </span>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         of {leaderboardData.totalUsers} members
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            </div>
+          </div>
+        </div>
+      </div>
               )}
 
               {/* Leaderboard Table - PREMIUM ENHANCEMENT */}
               {leaderboardData && leaderboardData.leaderboard.length > 0 ? (
                 <div className="glass-card-premium overflow-hidden hover-glow">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-muted/50 border-b border-border">
-                        <tr>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Rank
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Member
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Level
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Total XP
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Badges
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Trend
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Wins
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-muted/50 border-b border-border">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Rank
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Member
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Level
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Total XP
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Badges
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Trend
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Wins
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
                         {leaderboardData.leaderboard.map((entry) => (
-                          <tr
+                <tr
                             key={entry.userId}
-                            className={`
-                              ${getRankColor(entry.rank)}
-                              ${entry.isCurrentUser ? 'bg-primary/5 glow-accent' : 'hover:bg-muted/30'}
-                              transition-all duration-300
-                            `}
-                          >
-                            <td className="px-6 py-4">
-                              <div className="font-mono text-lg font-bold">#{entry.rank}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
+                  className={`
+                    ${getRankColor(entry.rank)}
+                    ${entry.isCurrentUser ? 'bg-primary/5 glow-accent' : 'hover:bg-muted/30'}
+                    transition-all duration-300
+                  `}
+                >
+                  <td className="px-6 py-4">
+                    <div className="font-mono text-lg font-bold">#{entry.rank}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
                                 {entry.avatarUrl ? (
                                   <img
                                     src={entry.avatarUrl}
@@ -255,37 +255,37 @@ const Leaderboard = () => {
                                     {entry.username.charAt(0).toUpperCase()}
                                   </div>
                                 )}
-                                <span className={entry.isCurrentUser ? "font-semibold text-primary" : ""}>
-                                  {entry.username}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <Badge variant="outline" className="font-mono">
-                                L{entry.level}
-                              </Badge>
-                            </td>
-                            <td className="px-6 py-4">
+                      <span className={entry.isCurrentUser ? "font-semibold text-primary" : ""}>
+                        {entry.username}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant="outline" className="font-mono">
+                      L{entry.level}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4">
                               <span className="font-mono font-semibold">{entry.totalXP.toLocaleString()}</span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="font-mono">{entry.badges}</span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <TrendIcon trend={entry.trend} change={entry.change} />
-                                {entry.change > 0 && <span className="text-sm">{entry.change}</span>}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="font-mono font-semibold text-primary">{entry.contestsWon}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="font-mono">{entry.badges}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <TrendIcon trend={entry.trend} change={entry.change} />
+                      {entry.change > 0 && <span className="text-sm">{entry.change}</span>}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="font-mono font-semibold text-primary">{entry.contestsWon}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
               ) : (
                 <div className="glass-card-premium p-12 text-center hover-glow">
                   <p className="text-muted-foreground">No leaderboard data available yet.</p>

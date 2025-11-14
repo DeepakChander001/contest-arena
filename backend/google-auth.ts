@@ -1,3 +1,4 @@
+// backend/google-auth.ts
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Request, Response } from 'express';
@@ -6,11 +7,12 @@ import { Request, Response } from 'express';
 export const configureGoogleAuth = () => {
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const callbackURL = process.env.GOOGLE_REDIRECT_URI || 'https://leaderboard.1to10x.com/api/auth/google/callback';
+  
+  // FIXED: Use the correct production callback URL
+  const callbackURL = 'https://leaderboard.1to10x.com/api/auth/google/callback';
 
-  if (!clientID || !clientSecret || clientID === 'your_google_client_id_here') {
-    console.warn('⚠️ Google OAuth credentials not configured - OAuth endpoints will return errors');
-    console.warn('📝 Please add your Google OAuth credentials to the .env file');
+  if (!clientID || !clientSecret) {
+    console.error('⚠️ Google OAuth credentials not configured');
     return;
   }
 
@@ -24,11 +26,8 @@ export const configureGoogleAuth = () => {
         id: profile.id,
         email: profile.emails?.[0]?.value,
         name: profile.displayName,
-        avatar: profile.photos?.[0]?.value,
       });
 
-      // Here you would typically save/update user in your database
-      // For now, we'll create a user object from the Google profile
       const user = {
         id: profile.id,
         email: profile.emails?.[0]?.value || '',
@@ -47,12 +46,10 @@ export const configureGoogleAuth = () => {
     }
   }));
 
-  // Serialize user for session
   passport.serializeUser((user: any, done) => {
     done(null, user);
   });
 
-  // Deserialize user from session
   passport.deserializeUser((user: any, done) => {
     done(null, user);
   });
@@ -61,169 +58,127 @@ export const configureGoogleAuth = () => {
 // Get Google OAuth URL
 export const getGoogleAuthUrl = (req: Request, res: Response) => {
   try {
-    console.log('🔐 GET /api/auth/google/url - Request received');
-    console.log('🔐 Request origin:', req.get('origin'));
-    console.log('🔐 Request headers:', req.headers);
-    
     const clientID = process.env.GOOGLE_CLIENT_ID;
-    const redirectURI = process.env.GOOGLE_REDIRECT_URI || 'https://leaderboard.1to10x.com/api/auth/google/callback';
     
-    console.log('🔐 Client ID present:', !!clientID);
-    console.log('🔐 Redirect URI:', redirectURI);
-    
-    if (!clientID || clientID === 'your_google_client_id_here' || clientID.trim() === '') {
-      console.error('❌ Google OAuth not configured - Client ID missing or invalid');
+    if (!clientID) {
       return res.status(500).json({
-        error: 'Google OAuth not configured',
-        message: 'Please add your Google OAuth credentials to the .env file. See ENV_FORMAT.md for instructions.',
-        details: {
-          hasClientID: !!clientID,
-          clientIDLength: clientID?.length || 0,
-        },
+        error: 'Google OAuth not configured'
       });
     }
 
+    // FIXED: Use the correct redirect URI
+    const redirectURI = 'https://leaderboard.1to10x.com/api/auth/google/callback';
     const scope = 'profile email';
-    const state = 'random_state_string'; // In production, use a proper state parameter
+    const state = Math.random().toString(36).substring(7);
     
-    // Add prompt=select_account to force account selection dialog
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${clientID}&` +
       `redirect_uri=${encodeURIComponent(redirectURI)}&` +
       `scope=${encodeURIComponent(scope)}&` +
       `response_type=code&` +
       `state=${state}&` +
-      `prompt=select_account`; // Force account selection
+      `prompt=select_account`;
 
-    console.log('✅ OAuth URL generated successfully');
-    console.log('✅ Redirect URI:', redirectURI);
-    
-    // Ensure we're sending JSON
-    res.setHeader('Content-Type', 'application/json');
     res.json({ url: authUrl });
   } catch (error: any) {
     console.error('❌ Error generating Google OAuth URL:', error);
-    res.setHeader('Content-Type', 'application/json');
     res.status(500).json({
-      error: 'Failed to generate OAuth URL',
-      message: error.message,
+      error: 'Failed to generate OAuth URL'
     });
   }
 };
 
-// Handle Google OAuth callback
+// Handle Google OAuth callback - SIMPLIFIED VERSION
 export const handleGoogleCallback = async (req: Request, res: Response) => {
-  passport.authenticate('google', async (err: any, user: any) => {
-    if (err) {
-      console.error('❌ Google OAuth callback error:', err);
-      return res.redirect(`${process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com'}/auth?error=oauth_error`);
+  const { code } = req.query;
+  
+  if (!code) {
+    return res.redirect('https://leaderboard.1to10x.com/auth?error=no_code');
+  }
+
+  try {
+    // Exchange code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code: code as string,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: 'https://leaderboard.1to10x.com/api/auth/google/callback',
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to exchange code for tokens');
     }
 
-    if (!user) {
-      console.error('❌ No user returned from Google OAuth');
-      return res.redirect(`${process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com'}/auth?error=no_user`);
+    const tokens = await tokenResponse.json();
+    
+    // Get user info
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${tokens.access_token}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error('Failed to get user info');
     }
 
-    // Store user in session with proper structure
+    const googleUser = await userResponse.json();
+
+    // Store user in session
     req.session.user = {
-      id: user.id,
-      email: user.email, // This is already set correctly from the Google profile
-      googleEmail: user.email,
-      name: (user.firstName + ' ' + user.lastName).trim(),
-      googleId: user.id,
-      googleName: (user.firstName + ' ' + user.lastName).trim(),
-      googleAvatarUrl: user.avatarUrl
+      id: googleUser.id,
+      email: googleUser.email,
+      name: googleUser.name,
+      googleId: googleUser.id,
+      googleEmail: googleUser.email,
+      googleName: googleUser.name,
+      googleAvatarUrl: googleUser.picture
     };
     
-    // Save the session explicitly
-    req.session.save((err) => {
-      if (err) {
-        console.error('❌ Error saving session:', err);
-      } else {
-        console.log('✅ Session saved successfully');
-      }
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve(true);
+      });
     });
+
+    // Redirect to frontend with user data
+    const userData = encodeURIComponent(JSON.stringify({
+      id: googleUser.id,
+      email: googleUser.email,
+      name: googleUser.name,
+      picture: googleUser.picture
+    }));
+
+    res.redirect(`https://leaderboard.1to10x.com/dashboard?success=true&user=${userData}`);
     
-    console.log('✅ User stored in session:', req.session.user);
-    console.log('✅ Session user email:', req.session.user.email);
-
-    // Check if user exists in Circle before redirecting
-    try {
-      const axios = (await import('axios')).default;
-      const adminToken = process.env.CIRCLE_ADMIN_API_TOKEN || process.env.VITE_CIRCLE_ADMIN_API_TOKEN;
-      
-      if (adminToken) {
-        console.log('🔍 Checking Circle membership for:', user.email);
-        const circleApiUrl = 'https://app.circle.so/api/admin/v2/community_members/search';
-        
-        try {
-          const circleResponse = await axios.get(circleApiUrl, {
-            params: { email: user.email },
-            headers: {
-              'Authorization': `Bearer ${adminToken}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (circleResponse.data && circleResponse.data.id) {
-            console.log('✅ User found in Circle, redirecting to dashboard');
-            const frontendUrl = process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com';
-            res.redirect(`${frontendUrl}/dashboard?success=true&user=${encodeURIComponent(JSON.stringify(user))}&circleMember=true`);
-            return;
-          }
-        } catch (circleError: any) {
-          // If 404 or user not found, redirect to profile creation
-          if (circleError.response?.status === 404 || !circleError.response?.data?.id) {
-            console.log('⚠️ User not found in Circle, redirecting to profile creation');
-            const frontendUrl = process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com';
-            res.redirect(`${frontendUrl}/create-profile?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent((user.firstName + ' ' + user.lastName).trim())}`);
-            return;
-          }
-          console.error('❌ Error checking Circle membership:', circleError.message);
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Error during Circle check:', error.message);
-    }
-
-    // Fallback: redirect to profile creation if Circle check fails
-    console.log('⚠️ Circle check failed, redirecting to profile creation');
-    const frontendUrl = process.env.FRONTEND_URL || 'https://leaderboard.1to10x.com';
-    res.redirect(`${frontendUrl}/create-profile?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent((user.firstName + ' ' + user.lastName).trim())}`);
-  })(req, res);
+  } catch (error: any) {
+    console.error('❌ OAuth callback error:', error);
+    res.redirect('https://leaderboard.1to10x.com/auth?error=oauth_failed');
+  }
 };
 
 // Get current user from session
 export const getCurrentUser = (req: Request, res: Response) => {
-  try {
-    if (!req.session.user) {
-      return res.status(401).json({
-        error: 'Not authenticated',
-        message: 'No user session found',
-      });
-    }
-
-    res.json(req.session.user);
-  } catch (error: any) {
-    console.error('❌ Error getting current user:', error);
-    res.status(500).json({
-      error: 'Failed to get user',
-      message: error.message,
-    });
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
   }
+  res.json(req.session.user);
 };
 
 // Logout
 export const logout = (req: Request, res: Response) => {
   req.session.destroy((err) => {
     if (err) {
-      console.error('❌ Error destroying session:', err);
-      return res.status(500).json({
-        error: 'Logout failed',
-        message: err.message,
-      });
+      return res.status(500).json({ error: 'Logout failed' });
     }
-
     res.json({ message: 'Logged out successfully' });
   });
 };
