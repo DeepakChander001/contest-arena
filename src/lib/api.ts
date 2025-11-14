@@ -64,8 +64,9 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
-    // Use relative path for Vercel functions
-    this.baseUrl = '/api';
+    // Use environment variable for API URL (defaults to production API)
+    const apiUrl = import.meta.env.VITE_API_URL || 'https://api.1to10x.com';
+    this.baseUrl = `${apiUrl}/api`;
   }
 
   // Health check
