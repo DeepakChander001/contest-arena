@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import session from 'express-session';
 import passport from 'passport';
 import verifyMemberHandler from './verify-member.js';
@@ -487,7 +488,6 @@ app.get('/api/member-spaces', (req, res) => {
 // On Vercel, static files are served separately, so we don't need this
 if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const frontendDistPath = path.resolve(__dirname, '../dist');
-  const fs = require('fs'); // Use require for synchronous check
   
   if (fs.existsSync(frontendDistPath)) {
     console.log('📦 Serving frontend static files from:', frontendDistPath);
