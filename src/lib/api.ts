@@ -1,7 +1,7 @@
 // API service for 1to10x Contest Arena
 // Handles all backend communication
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://leaderboard.1to10x.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.1to10x.com';
 
 export interface VerifyMemberRequest {
   email: string;
@@ -64,9 +64,11 @@ class ApiService {
   private baseUrl: string;
 
   constructor() {
-    // Use environment variable for API URL (defaults to production API)
+    // Use full backend URL from environment variable
+    // Default to api.1to10x.com if not set
     const apiUrl = import.meta.env.VITE_API_URL || 'https://api.1to10x.com';
-    this.baseUrl = `${apiUrl}/api`;
+    // Ensure the URL ends with /api for consistency
+    this.baseUrl = apiUrl.endsWith('/api') ? apiUrl : `${apiUrl}/api`;
   }
 
   // Health check

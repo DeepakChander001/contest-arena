@@ -3,7 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
 import session from 'express-session';
 import passport from 'passport';
 import verifyMemberHandler from './verify-member.js';
@@ -13,6 +12,7 @@ import getUserFromDbHandler from './get-user-from-db.js';
 import { updateUserProfile, upload } from './update-user-profile.js';
 import { getDailyRewards, claimDailyReward } from './daily-rewards.js';
 import createProfileHandler from './create-profile.js';
+import authCompleteHandler from './auth-complete.js';
 import { 
   configureGoogleAuth, 
   getGoogleAuthUrl, 
@@ -26,25 +26,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables from parent directory
-// When compiled, dist/server.js needs to look in ../backend/ for .env
-// This works both in dev (backend/.env) and prod (backend/dist/../.env = backend/.env)
-const envPath = path.resolve(__dirname, '../.env');
-const envLocalPath = path.resolve(__dirname, '../.env.local');
-
-console.log('🔍 Loading environment variables...');
-console.log('📂 __dirname:', __dirname);
-console.log('📄 .env path:', envPath);
-console.log('📄 .env exists:', fs.existsSync(envPath));
-console.log('📄 .env.local path:', envLocalPath);
-console.log('📄 .env.local exists:', fs.existsSync(envLocalPath));
-
-dotenv.config({ path: envPath });
-dotenv.config({ path: envLocalPath });
-
-console.log('✅ Dotenv loaded');
-console.log('🔐 NODE_ENV:', process.env.NODE_ENV);
-console.log('🔐 GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'Present (' + process.env.GOOGLE_CLIENT_ID.substring(0, 20) + '...)' : 'Missing');
-console.log('🔐 PORT:', process.env.PORT);
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -123,6 +106,7 @@ app.get('/api/auth/google/url', (req, res, next) => {
 app.get('/api/auth/google/callback', handleGoogleCallback);
 app.get('/api/auth/user', getCurrentUser);
 app.post('/api/auth/logout', logout);
+app.post('/api/auth/complete', authCompleteHandler);
 
 // Get user data from database (preferred method)
 app.get('/api/user', (req, res) => {
@@ -503,7 +487,8 @@ app.get('/api/member-spaces', (req, res) => {
 // On Vercel, static files are served separately, so we don't need this
 if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   const frontendDistPath = path.resolve(__dirname, '../dist');
-
+  const fs = require('fs'); // Use require for synchronous check
+  
   if (fs.existsSync(frontendDistPath)) {
     console.log('📦 Serving frontend static files from:', frontendDistPath);
     
